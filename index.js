@@ -2,7 +2,7 @@ var h    = require('hyperscript')
 var Vec2 = require('vec2')
 var View = require('vec2-view')
 
-var NOTE = h('pre', {style: {
+NOTE = h('pre', {style: {
     position: 'fixed',
     'z-index': 30,
     left:'20px',
@@ -37,7 +37,7 @@ module.exports = function () {
       'z-index': 20
     }})
 
-    for(var i = 1; i < 8; i ++) {
+    for(var i = 1; i < 16; i ++) {
       var l = new  Layer(i)
       layers.push(l)
       div.appendChild(l.div)
@@ -69,14 +69,14 @@ module.exports = function () {
 
     var scale = Math.pow(2, z)
 
-  NOTE.textContent = JSON.stringify([/*screenSize, screenMin, screenMax,*/ z, scale, [mX, mY, MX, MY]], null, 2)
+  NOTE.textContent = JSON.stringify([], null, 2)
 
     //show two layers at once (so you can see larger layer through gaps)
     if(layers[z2] && layers[z]){
       layers[z].update(screenMin, screenMax, view)
-      layers[z2].update(screenMin, screenMax, view)
+//      layers[z2].update(screenMin, screenMax, view)
       layers.forEach(function (e, i) {
-        e.show(i == z || i == z2)
+        e.show(i == z)
       })
     }
   })
