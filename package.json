@@ -10,7 +10,8 @@
   "dependencies": {
     "vec2-view": "~1.0.1",
     "hyperscript": "~1.2.3",
-    "vec2-dom": "~1.1.2"
+    "vec2-dom": "~1.1.2",
+    "tape": "~2.1.0"
   },
   "devDependencies": {},
   "scripts": {
