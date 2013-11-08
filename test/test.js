@@ -72,3 +72,29 @@ tape('unit^3', function (t) {
   t.end()
 })
 
+tape('unit overflow', function (t) {
+  var min   = new Vec2(-1, -1)
+  var max   = new Vec2(3, 3)
+  var scale = 1
+
+  var mt = tiles.min(min, scale)
+  var Mt = tiles.max(max, scale)
+
+  t.deepEqual(mt.toJSON(), {x: 0, y: 0})
+  t.deepEqual(Mt.toJSON(), {x: 2, y: 2})
+  t.end()
+})
+
+tape('unit', function (t) {
+  var min   = new Vec2(6, 5)
+  var max   = new Vec2(7, 7)
+  var scale = 1
+
+  var mt = tiles.min(min, scale)
+  var Mt = tiles.max(max, scale)
+
+  t.deepEqual(mt.toJSON(), {x: 2, y: 2})
+  t.deepEqual(Mt.toJSON(), {x: 2, y: 2})
+  t.end()
+})
+
