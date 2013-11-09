@@ -8,29 +8,24 @@ function round (v) {
   v.set(Math.floor(v.x), Math.floor(v.y))
   return v
 }
+
 var L = null
 
 function Layer (scale) {
   this.scale = scale
   this.tiles = {}
   this.div = h('div', {
-    'pointer-events': 'none',
-    left: '0px',
-    top:'0px',
-    'z-index': this.scale,
-    position: 'absolute'
+    'pointer-events' : 'none',
+    left             : '0px',
+    top              : '0px',
+    'z-index'        : this.scale,
+    position         : 'absolute'
   })
 }
 
 var l = Layer.prototype
-  function getTile(x, y, z, cb) {
-  }
 
-l.add = function (x, y) {
-  var id = x+':'+y
-  if(this.tiles[id]) return false
-
-  var z = this.scale
+l.getTile = function (x, y, z) {
 
   //make this injectable
   var src = 'https://khms1.google.com/kh/v=134&src=app'
@@ -39,8 +34,25 @@ l.add = function (x, y) {
           + '&z=' + z
           + '&s=G'
   ;
+  var img
+  return img = h('img', {src: src, onload: function () {
 
-  var img = h('img', {src: src, id: x+'_'+y+'_'+z, style: { 'pointer-events': 'none', 'opacity': '1'}})
+  }, onerror: function (e) {
+    img.style.opacity = 0.1
+    console.error('LOAD ERROR', e)
+  }})
+}
+
+l.add = function (x, y) {
+  var id = x+':'+y
+  if(this.tiles[id]) return false
+
+  var z = this.scale
+
+  var img = this.getTile(x, y, z)
+  img.id = x+'_'+y+'_'+z
+  img.style['pointer-events'] = 'none'
+
   this.div.appendChild(img)
   var r = vdom.absolute(img, true)
 
@@ -77,7 +89,7 @@ l.update = function (min, max, view) {
 
   for(var i =  m.x; i <= M.x; i++)
     for(var j =  m.y; j <= M.y; j++)
-      if(this.add(i, j)) console.log('ADD', i, j, scale, m, M)
+      this.add(i, j)
 
   for(var k in this.tiles) {
     var img = this.tiles[k]
@@ -91,11 +103,6 @@ l.update = function (min, max, view) {
     )
 
     img.style.width = Math.floor(view.zoom()/scale) + 'px'
-    if(!L)
-      L = img
-
-    if(L === img)
-      NOTE.textContent = JSON.stringify([img.style.width, img.style.left, img.style.top], null, 2)
 
     if(
       img.origin.x < m.x || img.origin.y < m.y ||
