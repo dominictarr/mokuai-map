@@ -14,7 +14,7 @@ tape('unit', function (t) {
   var Mt = tiles.max(max, scale)
 
   t.deepEqual(mt.toJSON(), {x: 0, y: 0})
-  t.deepEqual(Mt.toJSON(), {x: 2, y: 2})
+  t.deepEqual(Mt.toJSON(), {x: 1, y: 1})
   t.end()
 })
 
@@ -27,7 +27,7 @@ tape('unit', function (t) {
   var Mt = tiles.max(max, scale)
 
   t.deepEqual(mt.toJSON(), {x: 0, y: 0})
-  t.deepEqual(Mt.toJSON(), {x: 2, y: 2})
+  t.deepEqual(Mt.toJSON(), {x: 1, y: 1})
   t.end()
 })
 
@@ -40,7 +40,7 @@ tape('unit^2', function (t) {
   var Mt = tiles.max(max, scale)
 
   t.deepEqual(mt.toJSON(), {x: 0, y: 0})
-  t.deepEqual(Mt.toJSON(), {x: 4, y: 4})
+  t.deepEqual(Mt.toJSON(), {x: 3, y: 3})
   t.end()
 })
 
@@ -54,7 +54,7 @@ tape('unit^3', function (t) {
 
   console.log(mt, Mt)
   t.deepEqual(mt.toJSON(), {x: 4, y: 4})
-  t.deepEqual(Mt.toJSON(), {x: 8, y: 8})
+  t.deepEqual(Mt.toJSON(), {x: 7, y: 7})
   t.end()
 })
 
@@ -81,7 +81,7 @@ tape('unit overflow', function (t) {
   var Mt = tiles.max(max, scale)
 
   t.deepEqual(mt.toJSON(), {x: 0, y: 0})
-  t.deepEqual(Mt.toJSON(), {x: 2, y: 2})
+  t.deepEqual(Mt.toJSON(), {x: 1, y: 1})
   t.end()
 })
 
@@ -93,8 +93,8 @@ tape('unit', function (t) {
   var mt = tiles.min(min, scale)
   var Mt = tiles.max(max, scale)
 
-  t.deepEqual(mt.toJSON(), {x: 2, y: 2})
-  t.deepEqual(Mt.toJSON(), {x: 2, y: 2})
+  t.deepEqual(mt.toJSON(), {x: 1, y: 1})
+  t.deepEqual(Mt.toJSON(), {x: 1, y: 1})
   t.end()
 })
 
