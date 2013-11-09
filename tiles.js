@@ -13,13 +13,13 @@ function ceil (v) {
 function minTile (min, scale, v) {
   v = v || new Vec2()
   var z = Math.pow(2, scale - 1)
-  return floor(v.set(min).multiply(Math.pow(2, scale - 1))).clamp(m, M.set(z*2, z*2))
+  return floor(v.set(min).multiply(z)).clamp(m, M.set(z*2 - 1, z*2 - 1))
 }
 
 function maxTile (max, scale, v) {
   v = v || new Vec2()
   var z = Math.pow(2, scale - 1)
-  return ceil(v.set(max).multiply(z)).clamp(m, M.set(z*2, z*2))
+  return ceil(v.set(max).multiply(z)).clamp(m, M.set(z*2 - 1, z*2 - 1))
 }
 
 exports.min = minTile
