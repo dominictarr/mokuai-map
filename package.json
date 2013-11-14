@@ -11,7 +11,7 @@
     "vec2-view": "~2.0.0",
     "hyperscript": "~1.2.3",
     "vec2-dom": "~1.1.2",
-    "vec2-tile-layer": "~1.0.1"
+    "vec2-tile-layer": "~2.0.0"
   },
   "devDependencies": {
     "tape": "~2.1.0"
