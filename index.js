@@ -2,16 +2,16 @@ var h    = require('hyperscript')
 var Vec2 = require('vec2')
 var View = require('vec2-view')
 var Layer = require('vec2-tile-layer')
-
-NOTE = h('pre', {style: {
-    position: 'fixed',
-    'z-index': 30,
-    left:'20px',
-    top:'20px',
-    border: '1px solid'
-}})
-
-document.body.appendChild(NOTE)
+//
+//NOTE = h('pre', {style: {
+//    position: 'fixed',
+//    'z-index': 30,
+//    left:'20px',
+//    top:'20px',
+//    border: '1px solid'
+//}})
+//
+//document.body.appendChild(NOTE)
 
 function round (v) {
   v.set(Math.round(v.x), Math.round(v.y))
@@ -68,7 +68,7 @@ module.exports = function (opts) {
       layers.length - 2), 0)
     var z2 = z + 1
 
-  NOTE.textContent = JSON.stringify([view.world, view.world.bound, view.zoom], null, 2)
+//  NOTE.textContent = JSON.stringify([view.world, view.world.bound, view.zoom], null, 2)
 
     //show two layers at once (so you can see larger layer through gaps)
     if(/*layers[z2] && */layers[z]){
