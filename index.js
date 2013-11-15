@@ -19,7 +19,7 @@ function round (v) {
 }
 
 
-module.exports = function () {
+module.exports = function (opts) {
 
   var layers = []
 
@@ -32,7 +32,7 @@ module.exports = function () {
       //TODO: make the dimensions a parameter
 //      width: window.innerWidth + 'px',
 //      height: window.innerHeight + 'px',
-      width: '1000px', height: '1000px',
+      width: '1024px', height: '1024px',
       'overflow': 'hidden',
       'position': 'relative',
       'z-index': 20,
@@ -41,23 +41,20 @@ module.exports = function () {
 
     }})
 
+  
+
   var view = new View()
 //  view.view.set(window.innerWidth, window.innerHeight)
   view.zoom.set(1, 1)
-  view.view.set(1000, 1000)
+  view.view.set(1024, 1024)
 
-  view.center.set(500, 500)
+  view.center.set(512, 512)
   view.track(document.body)
-//  for(var i = 1; i < 16; i ++) {
-//    var l = new  Layer({scale: i, size: view.view})
-//    layers.push(l)
-//    div.appendChild(l.div)
-//  }
-
-    var l = new  Layer({scale: 1, size: view.view})
+  for(var i = 1; i < 22; i ++) {
+    var l = new  Layer({scale: i, size: view.view})
     layers.push(l)
     div.appendChild(l.div)
-  
+  }
 
   //get screen dimensions
   //get the screen in the model
@@ -66,10 +63,9 @@ module.exports = function () {
   view.change(update)
 
   function update () {
-    var z = Math.min(
+    var z = Math.max(Math.min(
       Math.floor(Math.log(view.zoom.x)/Math.LN2) + 1,
-      layers.length - 2)
-    var z = 0
+      layers.length - 2), 0)
     var z2 = z + 1
 
   NOTE.textContent = JSON.stringify([view.world, view.world.bound, view.zoom], null, 2)
@@ -77,16 +73,15 @@ module.exports = function () {
     //show two layers at once (so you can see larger layer through gaps)
     if(/*layers[z2] && */layers[z]){
       layers.forEach(function (e, i) {
-        if(i === z) {
+        if(i <= z)
           e.update(view.world, view.world.bound, view.zoom)
-        }
-        e.show(i == z)
+        e.show(i === z)
       })
     }
 
   }
 
-//  update()
+  //poll the parentElement until this element is added.
   var i = setInterval(function () {
     if(!div.parentElement) return
     clearInterval(i)
