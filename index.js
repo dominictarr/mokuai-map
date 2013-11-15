@@ -1,15 +1,15 @@
 var h    = require('hyperscript')
 var Vec2 = require('vec2')
 var View = require('vec2-view')
+var Layer = require('vec2-tile-layer')
 
 NOTE = h('pre', {style: {
     position: 'fixed',
     'z-index': 30,
     left:'20px',
-    top:'20px'
+    top:'20px',
+    border: '1px solid'
 }})
-
-var Layer = require('./layer')
 
 document.body.appendChild(NOTE)
 
@@ -25,61 +25,73 @@ module.exports = function () {
 
   //fix how the divs work... tiles should be in layers
   //and should be layed ontop of each other (more detailed ontop of less)
-  
+//    console.log(windew.innerWidth, windew.innerHeight)
   var div = h('div', {style: {
       //these settings will make the map appear within the box
       //so that it's embedable.
       //TODO: make the dimensions a parameter
-      width: window.innerWidth + 'px',
-      height: window.innerHeight + 'px',
+//      width: window.innerWidth + 'px',
+//      height: window.innerHeight + 'px',
+      width: '1000px', height: '1000px',
       'overflow': 'hidden',
       'position': 'relative',
-      'z-index': 20
+      'z-index': 20,
+      'border' : '1px solid',
+      background: 'lightblue'
+
     }})
 
-    for(var i = 1; i < 16; i ++) {
-      var l = new  Layer(i)
-      layers.push(l)
-      div.appendChild(l.div)
-    }
+  var view = new View()
+//  view.view.set(window.innerWidth, window.innerHeight)
+  view.zoom.set(1, 1)
+  view.view.set(1000, 1000)
 
-  var view = new View().track(document.body)
-  view.view.set(window.innerWidth, window.innerHeight)
-  view.zoom(256)
+  view.center.set(500, 500)
+  view.track(document.body)
+//  for(var i = 1; i < 16; i ++) {
+//    var l = new  Layer({scale: i, size: view.view})
+//    layers.push(l)
+//    div.appendChild(l.div)
+//  }
+
+    var l = new  Layer({scale: 1, size: view.view})
+    layers.push(l)
+    div.appendChild(l.div)
+  
 
   //get screen dimensions
   //get the screen in the model
 
   view.screenModel = new Vec2()
+  view.change(update)
 
-  var screenSize = view.view.divide(view.zoom()*2, true)
-  var screenMin = view.center.add(screenSize, true)
-  var screenMax = view.center.subtract(screenSize, true)
-
-   view.change(function (e) {
+  function update () {
     var z = Math.min(
-      Math.floor(Math.log(view.zoom()/256)/Math.LN2) + 1,
+      Math.floor(Math.log(view.zoom.x)/Math.LN2) + 1,
       layers.length - 2)
+    var z = 0
     var z2 = z + 1
-    
-    //TODO: refactor this out 
-    screenSize.set(view.view).divide(view.zoom()*2)
-    screenMax.set(view.center).add(screenSize)
-    screenMin.set(view.center).subtract(screenSize)
 
-    var scale = Math.pow(2, z)
-
-  NOTE.textContent = JSON.stringify([], null, 2)
+  NOTE.textContent = JSON.stringify([view.world, view.world.bound, view.zoom], null, 2)
 
     //show two layers at once (so you can see larger layer through gaps)
-    if(layers[z2] && layers[z]){
-      layers[z].update(screenMin, screenMax, view)
-//      layers[z2].update(screenMin, screenMax, view)
+    if(/*layers[z2] && */layers[z]){
       layers.forEach(function (e, i) {
+        if(i === z) {
+          e.update(view.world, view.world.bound, view.zoom)
+        }
         e.show(i == z)
       })
     }
-  })
 
+  }
+
+//  update()
+  var i = setInterval(function () {
+    if(!div.parentElement) return
+    clearInterval(i)
+    update()
+
+  }, 50)
   return div
 }
