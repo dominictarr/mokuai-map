@@ -8,7 +8,7 @@
     "url": "git://github.com/dominictarr/vec2-tiles.git"
   },
   "dependencies": {
-    "vec2-view": "~2.0.0",
+    "vec2-view": "~2.0.1",
     "hyperscript": "~1.2.3",
     "vec2-dom": "~1.1.2",
     "vec2-tile-layer": "~2.0.0"
