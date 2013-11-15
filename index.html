@@ -6,6 +6,1791 @@
 <body></body>
 <script language=javascript>
 ;(function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);throw new Error("Cannot find module '"+o+"'")}var f=n[o]={exports:{}};t[o][0].call(f.exports,function(e){var n=t[o][1][e];return s(n?n:e)},f,f.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+
+var map = require('./')()
+
+document.body.appendChild(map)
+
+
+
+},{"./":2}],2:[function(require,module,exports){
+var h    = require('hyperscript')
+var Vec2 = require('vec2')
+var View = require('vec2-view')
+var Layer = require('vec2-tile-layer')
+//
+//NOTE = h('pre', {style: {
+//    position: 'fixed',
+//    'z-index': 30,
+//    left:'20px',
+//    top:'20px',
+//    border: '1px solid'
+//}})
+//
+//document.body.appendChild(NOTE)
+
+function round (v) {
+  v.set(Math.round(v.x), Math.round(v.y))
+  return v
+}
+
+
+module.exports = function (opts) {
+
+  var layers = []
+
+  //fix how the divs work... tiles should be in layers
+  //and should be layed ontop of each other (more detailed ontop of less)
+//    console.log(windew.innerWidth, windew.innerHeight)
+  var div = h('div', {style: {
+      //these settings will make the map appear within the box
+      //so that it's embedable.
+      //TODO: make the dimensions a parameter
+//      width: window.innerWidth + 'px',
+//      height: window.innerHeight + 'px',
+      width: '1024px', height: '1024px',
+      'overflow': 'hidden',
+      'position': 'relative',
+      'z-index': 20,
+      'border' : '1px solid',
+      background: 'lightblue'
+
+    }})
+
+  
+
+  var view = new View()
+//  view.view.set(window.innerWidth, window.innerHeight)
+  view.zoom.set(1, 1)
+  view.view.set(1024, 1024)
+
+  view.center.set(512, 512)
+  view.track(document.body)
+  for(var i = 1; i < 22; i ++) {
+    var l = new  Layer({scale: i, size: view.view})
+    layers.push(l)
+    div.appendChild(l.div)
+  }
+
+  //get screen dimensions
+  //get the screen in the model
+
+  view.screenModel = new Vec2()
+  view.change(update)
+
+  function update () {
+    var z = Math.max(Math.min(
+      Math.floor(Math.log(view.zoom.x)/Math.LN2) + 1,
+      layers.length - 2), 0)
+    var z2 = z + 1
+
+//  NOTE.textContent = JSON.stringify([view.world, view.world.bound, view.zoom], null, 2)
+
+    //show two layers at once (so you can see larger layer through gaps)
+    if(/*layers[z2] && */layers[z]){
+      layers.forEach(function (e, i) {
+        if(i <= z)
+          e.update(view.world, view.world.bound, view.zoom)
+        e.show(i === z)
+      })
+    }
+
+  }
+
+  //poll the parentElement until this element is added.
+  var i = setInterval(function () {
+    if(!div.parentElement) return
+    clearInterval(i)
+    update()
+
+  }, 50)
+  return div
+}
+
+},{"hyperscript":3,"vec2":22,"vec2-tile-layer":15,"vec2-view":16}],3:[function(require,module,exports){
+var split = require('browser-split')
+var ClassList = require('class-list')
+var DataSet = require('data-set')
+require('html-element')
+
+module.exports = h
+
+function h() {
+  var args = [].slice.call(arguments), e = null
+  function item (l) {
+    var r
+    function parseClass (string) {
+      var m = split(string, /([\.#]?[a-zA-Z0-9_-]+)/)
+      forEach(m, function (v) {
+        var s = v.substring(1,v.length)
+        if(!v) return
+        if(!e)
+          e = document.createElement(v)
+        else if (v[0] === '.')
+          ClassList(e).add(s)
+        else if (v[0] === '#')
+          e.setAttribute('id', s)
+      })
+    }
+
+    if(l == null)
+      ;
+    else if('string' === typeof l) {
+      if(!e)
+        parseClass(l)
+      else
+        e.appendChild(r = document.createTextNode(l))
+    }
+    else if('number' === typeof l
+      || 'boolean' === typeof l
+      || l instanceof Date
+      || l instanceof RegExp ) {
+        e.appendChild(r = document.createTextNode(l.toString()))
+    }
+    //there might be a better way to handle this...
+    else if (isArray(l))
+      forEach(l, item)
+    else if(isNode(l))
+      e.appendChild(r = l)
+    else if(l instanceof Text)
+      e.appendChild(r = l)
+    else if ('object' === typeof l) {
+      for (var k in l) {
+        if('function' === typeof l[k]) {
+          if(/^on\w+/.test(k)) {
+            e.addEventListener
+              ? e.addEventListener(k.substring(2), l[k], false)
+              : e.attachEvent(k, l[k])
+          } else {
+            e[k] = l[k]()
+            l[k](function (v) {
+              e[k] = v
+            })
+          }
+        }
+        else if(k === 'style') {
+          if('string' === typeof l[k]) {
+            e.style.cssText = l[k]
+          } else {
+            for (var s in l[k]) (function(s, v) {
+              if('function' === typeof v) {
+                e.style.setProperty(s, v())
+                v(function (val) {
+                  e.style.setProperty(s, val)
+                })
+              } else
+                e.style.setProperty(s, l[k][s])
+            })(s, l[k][s])
+          }
+        } else if (k.substr(0, 5) === "data-") {
+          DataSet(e)[k.substr(5)] = l[k]
+        } else {
+          e[k] = l[k]
+        }
+      }
+    } else if ('function' === typeof l) {
+      //assume it's an observable!
+      var v = l()
+      e.appendChild(r = isNode(v) ? v : document.createTextNode(v))
+
+      l(function (v) {
+        if(isNode(v) && r.parentElement)
+          r.parentElement.replaceChild(v, r), r = v
+        else
+          r.textContent = v
+      })
+
+    }
+
+    return r
+  }
+  while(args.length)
+    item(args.shift())
+
+  return e
+}
+
+function isNode (el) {
+  return el && el.nodeName && el.nodeType
+}
+
+function isText (el) {
+  return el && el.nodeName === '#text' && el.nodeType == 3
+}
+
+function forEach (arr, fn) {
+  if (arr.forEach) return arr.forEach(fn)
+  for (var i = 0; i < arr.length; i++) fn(arr[i], i)
+}
+
+function isArray (arr) {
+  return Object.prototype.toString.call(arr) == '[object Array]'
+}
+
+},{"browser-split":4,"class-list":5,"data-set":7,"html-element":25}],4:[function(require,module,exports){
+/*!
+ * Cross-Browser Split 1.1.1
+ * Copyright 2007-2012 Steven Levithan <stevenlevithan.com>
+ * Available under the MIT License
+ * ECMAScript compliant, uniform cross-browser split method
+ */
+
+/**
+ * Splits a string into an array of strings using a regex or string separator. Matches of the
+ * separator are not included in the result array. However, if `separator` is a regex that contains
+ * capturing groups, backreferences are spliced into the result each time `separator` is matched.
+ * Fixes browser bugs compared to the native `String.prototype.split` and can be used reliably
+ * cross-browser.
+ * @param {String} str String to split.
+ * @param {RegExp|String} separator Regex or string to use for separating the string.
+ * @param {Number} [limit] Maximum number of items to include in the result array.
+ * @returns {Array} Array of substrings.
+ * @example
+ *
+ * // Basic use
+ * split('a b c d', ' ');
+ * // -> ['a', 'b', 'c', 'd']
+ *
+ * // With limit
+ * split('a b c d', ' ', 2);
+ * // -> ['a', 'b']
+ *
+ * // Backreferences in result array
+ * split('..word1 word2..', /([a-z]+)(\d+)/i);
+ * // -> ['..', 'word', '1', ' ', 'word', '2', '..']
+ */
+module.exports = (function split(undef) {
+
+  var nativeSplit = String.prototype.split,
+    compliantExecNpcg = /()??/.exec("")[1] === undef,
+    // NPCG: nonparticipating capturing group
+    self;
+
+  self = function(str, separator, limit) {
+    // If `separator` is not a regex, use `nativeSplit`
+    if (Object.prototype.toString.call(separator) !== "[object RegExp]") {
+      return nativeSplit.call(str, separator, limit);
+    }
+    var output = [],
+      flags = (separator.ignoreCase ? "i" : "") + (separator.multiline ? "m" : "") + (separator.extended ? "x" : "") + // Proposed for ES6
+      (separator.sticky ? "y" : ""),
+      // Firefox 3+
+      lastLastIndex = 0,
+      // Make `global` and avoid `lastIndex` issues by working with a copy
+      separator = new RegExp(separator.source, flags + "g"),
+      separator2, match, lastIndex, lastLength;
+    str += ""; // Type-convert
+    if (!compliantExecNpcg) {
+      // Doesn't need flags gy, but they don't hurt
+      separator2 = new RegExp("^" + separator.source + "$(?!\\s)", flags);
+    }
+    /* Values for `limit`, per the spec:
+     * If undefined: 4294967295 // Math.pow(2, 32) - 1
+     * If 0, Infinity, or NaN: 0
+     * If positive number: limit = Math.floor(limit); if (limit > 4294967295) limit -= 4294967296;
+     * If negative number: 4294967296 - Math.floor(Math.abs(limit))
+     * If other: Type-convert, then use the above rules
+     */
+    limit = limit === undef ? -1 >>> 0 : // Math.pow(2, 32) - 1
+    limit >>> 0; // ToUint32(limit)
+    while (match = separator.exec(str)) {
+      // `separator.lastIndex` is not reliable cross-browser
+      lastIndex = match.index + match[0].length;
+      if (lastIndex > lastLastIndex) {
+        output.push(str.slice(lastLastIndex, match.index));
+        // Fix browsers whose `exec` methods don't consistently return `undefined` for
+        // nonparticipating capturing groups
+        if (!compliantExecNpcg && match.length > 1) {
+          match[0].replace(separator2, function() {
+            for (var i = 1; i < arguments.length - 2; i++) {
+              if (arguments[i] === undef) {
+                match[i] = undef;
+              }
+            }
+          });
+        }
+        if (match.length > 1 && match.index < str.length) {
+          Array.prototype.push.apply(output, match.slice(1));
+        }
+        lastLength = match[0].length;
+        lastLastIndex = lastIndex;
+        if (output.length >= limit) {
+          break;
+        }
+      }
+      if (separator.lastIndex === match.index) {
+        separator.lastIndex++; // Avoid an infinite loop
+      }
+    }
+    if (lastLastIndex === str.length) {
+      if (lastLength || !separator.test("")) {
+        output.push("");
+      }
+    } else {
+      output.push(str.slice(lastLastIndex));
+    }
+    return output.length > limit ? output.slice(0, limit) : output;
+  };
+
+  return self;
+})();
+
+},{}],5:[function(require,module,exports){
+// contains, add, remove, toggle
+var indexof = require('indexof')
+
+module.exports = ClassList
+
+function ClassList(elem) {
+    var cl = elem.classList
+
+    if (cl) {
+        return cl
+    }
+
+    var classList = {
+        add: add
+        , remove: remove
+        , contains: contains
+        , toggle: toggle
+        , toString: $toString
+        , length: 0
+        , item: item
+    }
+
+    return classList
+
+    function add(token) {
+        var list = getTokens()
+        if (indexof(list, token) > -1) {
+            return
+        }
+        list.push(token)
+        setTokens(list)
+    }
+
+    function remove(token) {
+        var list = getTokens()
+            , index = indexof(list, token)
+
+        if (index === -1) {
+            return
+        }
+
+        list.splice(index, 1)
+        setTokens(list)
+    }
+
+    function contains(token) {
+        return indexof(getTokens(), token) > -1
+    }
+
+    function toggle(token) {
+        if (contains(token)) {
+            remove(token)
+            return false
+        } else {
+            add(token)
+            return true
+        }
+    }
+
+    function $toString() {
+        return elem.className
+    }
+
+    function item(index) {
+        var tokens = getTokens()
+        return tokens[index] || null
+    }
+
+    function getTokens() {
+        var className = elem.className
+
+        return filter(className.split(" "), isTruthy)
+    }
+
+    function setTokens(list) {
+        var length = list.length
+
+        elem.className = list.join(" ")
+        classList.length = length
+
+        for (var i = 0; i < list.length; i++) {
+            classList[i] = list[i]
+        }
+
+        delete list[length]
+    }
+}
+
+function filter (arr, fn) {
+    var ret = []
+    for (var i = 0; i < arr.length; i++) {
+        if (fn(arr[i])) ret.push(arr[i])
+    }
+    return ret
+}
+
+function isTruthy(value) {
+    return !!value
+}
+
+},{"indexof":6}],6:[function(require,module,exports){
+
+var indexOf = [].indexOf;
+
+module.exports = function(arr, obj){
+  if (indexOf) return arr.indexOf(obj);
+  for (var i = 0; i < arr.length; ++i) {
+    if (arr[i] === obj) return i;
+  }
+  return -1;
+};
+},{}],7:[function(require,module,exports){
+var Weakmap = require("weakmap")
+var Individual = require("individual")
+
+var datasetMap = Individual("__DATA_SET_WEAKMAP", Weakmap())
+
+module.exports = DataSet
+
+function DataSet(elem) {
+    if (elem.dataset) {
+        return elem.dataset
+    }
+
+    var hash = datasetMap.get(elem)
+
+    if (!hash) {
+        hash = createHash(elem)
+        datasetMap.set(elem, hash)
+    }
+
+    return hash
+}
+
+function createHash(elem) {
+    var attributes = elem.attributes
+    var hash = {}
+
+    if (attributes === null || attributes === undefined) {
+        return hash
+    }
+
+    for (var i = 0; i < attributes.length; i++) {
+        var attr = attributes[i]
+
+        if (attr.name.substr(0,5) !== "data-") {
+            continue
+        }
+
+        hash[attr.name.substr(5)] = attr.value
+    }
+
+    return hash
+}
+
+},{"individual":8,"weakmap":10}],8:[function(require,module,exports){
+var root = require("global")
+
+module.exports = Individual
+
+function Individual(key, value) {
+    if (root[key]) {
+        return root[key]
+    }
+
+    Object.defineProperty(root, key, {
+        value: value
+        , configurable: true
+    })
+
+    return value
+}
+
+},{"global":9}],9:[function(require,module,exports){
+var global=typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {};/*global window, global*/
+if (typeof global !== "undefined") {
+    module.exports = global
+} else if (typeof window !== "undefined") {
+    module.exports = window
+}
+
+},{}],10:[function(require,module,exports){
+/* (The MIT License)
+ *
+ * Copyright (c) 2012 Brandon Benvie <http://bbenvie.com>
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
+ * associated documentation files (the 'Software'), to deal in the Software without restriction,
+ * including without limitation the rights to use, copy, modify, merge, publish, distribute,
+ * sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included with all copies or
+ * substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING
+ * BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY  CLAIM,
+ * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ */
+
+// Original WeakMap implementation by Gozala @ https://gist.github.com/1269991
+// Updated and bugfixed by Raynos @ https://gist.github.com/1638059
+// Expanded by Benvie @ https://github.com/Benvie/harmony-collections
+
+void function(global, undefined_, undefined){
+  var getProps = Object.getOwnPropertyNames,
+      defProp  = Object.defineProperty,
+      toSource = Function.prototype.toString,
+      create   = Object.create,
+      hasOwn   = Object.prototype.hasOwnProperty,
+      funcName = /^\n?function\s?(\w*)?_?\(/;
+
+
+  function define(object, key, value){
+    if (typeof key === 'function') {
+      value = key;
+      key = nameOf(value).replace(/_$/, '');
+    }
+    return defProp(object, key, { configurable: true, writable: true, value: value });
+  }
+
+  function nameOf(func){
+    return typeof func !== 'function'
+          ? '' : 'name' in func
+          ? func.name : toSource.call(func).match(funcName)[1];
+  }
+
+  // ############
+  // ### Data ###
+  // ############
+
+  var Data = (function(){
+    var dataDesc = { value: { writable: true, value: undefined } },
+        datalock = 'return function(k){if(k===s)return l}',
+        uids     = create(null),
+
+        createUID = function(){
+          var key = Math.random().toString(36).slice(2);
+          return key in uids ? createUID() : uids[key] = key;
+        },
+
+        globalID = createUID(),
+
+        storage = function(obj){
+          if (hasOwn.call(obj, globalID))
+            return obj[globalID];
+
+          if (!Object.isExtensible(obj))
+            throw new TypeError("Object must be extensible");
+
+          var store = create(null);
+          defProp(obj, globalID, { value: store });
+          return store;
+        };
+
+    // common per-object storage area made visible by patching getOwnPropertyNames'
+    define(Object, function getOwnPropertyNames(obj){
+      var props = getProps(obj);
+      if (hasOwn.call(obj, globalID))
+        props.splice(props.indexOf(globalID), 1);
+      return props;
+    });
+
+    function Data(){
+      var puid = createUID(),
+          secret = {};
+
+      this.unlock = function(obj){
+        var store = storage(obj);
+        if (hasOwn.call(store, puid))
+          return store[puid](secret);
+
+        var data = create(null, dataDesc);
+        defProp(store, puid, {
+          value: new Function('s', 'l', datalock)(secret, data)
+        });
+        return data;
+      }
+    }
+
+    define(Data.prototype, function get(o){ return this.unlock(o).value });
+    define(Data.prototype, function set(o, v){ this.unlock(o).value = v });
+
+    return Data;
+  }());
+
+
+  var WM = (function(data){
+    var validate = function(key){
+      if (key == null || typeof key !== 'object' && typeof key !== 'function')
+        throw new TypeError("Invalid WeakMap key");
+    }
+
+    var wrap = function(collection, value){
+      var store = data.unlock(collection);
+      if (store.value)
+        throw new TypeError("Object is already a WeakMap");
+      store.value = value;
+    }
+
+    var unwrap = function(collection){
+      var storage = data.unlock(collection).value;
+      if (!storage)
+        throw new TypeError("WeakMap is not generic");
+      return storage;
+    }
+
+    var initialize = function(weakmap, iterable){
+      if (iterable !== null && typeof iterable === 'object' && typeof iterable.forEach === 'function') {
+        iterable.forEach(function(item, i){
+          if (item instanceof Array && item.length === 2)
+            set.call(weakmap, iterable[i][0], iterable[i][1]);
+        });
+      }
+    }
+
+
+    function WeakMap(iterable){
+      if (this === global || this == null || this === WeakMap.prototype)
+        return new WeakMap(iterable);
+
+      wrap(this, new Data);
+      initialize(this, iterable);
+    }
+
+    function get(key){
+      validate(key);
+      var value = unwrap(this).get(key);
+      return value === undefined_ ? undefined : value;
+    }
+
+    function set(key, value){
+      validate(key);
+      // store a token for explicit undefined so that "has" works correctly
+      unwrap(this).set(key, value === undefined ? undefined_ : value);
+    }
+
+    function has(key){
+      validate(key);
+      return unwrap(this).get(key) !== undefined;
+    }
+
+    function delete_(key){
+      validate(key);
+      var data = unwrap(this),
+          had = data.get(key) !== undefined;
+      data.set(key, undefined);
+      return had;
+    }
+
+    function toString(){
+      unwrap(this);
+      return '[object WeakMap]';
+    }
+
+    try {
+      var src = ('return '+delete_).replace('e_', '\\u0065'),
+          del = new Function('unwrap', 'validate', src)(unwrap, validate);
+    } catch (e) {
+      var del = delete_;
+    }
+
+    var src = (''+Object).split('Object');
+    var stringifier = function toString(){
+      return src[0] + nameOf(this) + src[1];
+    };
+
+    define(stringifier, stringifier);
+
+    var prep = { __proto__: [] } instanceof Array
+      ? function(f){ f.__proto__ = stringifier }
+      : function(f){ define(f, stringifier) };
+
+    prep(WeakMap);
+
+    [toString, get, set, has, del].forEach(function(method){
+      define(WeakMap.prototype, method);
+      prep(method);
+    });
+
+    return WeakMap;
+  }(new Data));
+
+  var defaultCreator = Object.create
+    ? function(){ return Object.create(null) }
+    : function(){ return {} };
+
+  function createStorage(creator){
+    var weakmap = new WM;
+    creator || (creator = defaultCreator);
+
+    function storage(object, value){
+      if (value || arguments.length === 2) {
+        weakmap.set(object, value);
+      } else {
+        value = weakmap.get(object);
+        if (value === undefined) {
+          value = creator(object);
+          weakmap.set(object, value);
+        }
+      }
+      return value;
+    }
+
+    return storage;
+  }
+
+
+  if (typeof module !== 'undefined') {
+    module.exports = WM;
+  } else if (typeof exports !== 'undefined') {
+    exports.WeakMap = WM;
+  } else if (!('WeakMap' in global)) {
+    global.WeakMap = WM;
+  }
+
+  WM.createStorage = createStorage;
+  if (global.WeakMap)
+    global.WeakMap.createStorage = createStorage;
+}((0, eval)('this'));
+
+},{}],11:[function(require,module,exports){
+var Vec2 = require('vec2')
+var Rec2 = require('rec2')
+
+var mouse, scroll, screen, size
+
+var element =
+exports.element = function (el, bind) {
+  var rec = el.getBoundingClientRect()    
+  var rec2 = new Rec2()
+  
+  var style = getComputedStyle(el)
+
+  rec2.set((rec.left || 0)  - (parseFloat(style['margin-left']) || 0)
+    , (rec.top || 0) - (parseFloat(style['margin-top']) || 0)) 
+  //check if it's actually a Rec2 - if it's a vec2
+  //skip this step.
+
+  if(rec2.size)
+    rec2.size.set(rec.width, rec.height)
+
+  if(bind) {
+    rec2.size.change(function (size) {
+      el.style.width  = size.x + 'px'
+      el.style.height = size.y + 'px'
+    })
+  }
+
+  return rec2
+}
+
+exports.mouseEvent = mouseEvent
+
+//function (ev) {
+//  return new Vec2(ev.clientX, ev.clientY)
+//}
+
+//var style = getComputedStyle(el)
+// + parseFloat(style['margin-top'])
+// + parseFloat(style['margin-left'])
+
+var elementRec2 = function (el) {
+  var rec = el.getBoundingClientRect()    
+  var style = getComputedStyle(el)
+  return new Rec2(
+    rec.left - parseFloat(style.left),
+    rec.top - parseFloat(style.top),
+    rec.width, rec.height
+  )
+}
+
+function mouseEvent (ev) {
+  var vec = new Vec2()
+  return vec.set(ev.clientX, ev.clientY)
+}
+
+exports.mouse = function () {
+  if(mouse) return mouse
+  mouse = new Vec2()
+  window.addEventListener('mousemove', function (e) {
+    mouse.set(e.clientX, e.clientY)
+  })
+  return mouse
+}
+
+exports.scroll = function () {
+  if(scroll) return scroll
+  scroll = new Vec2()
+  scroll.set(e.clientX, e.clientY)
+  window.addEventListener('scroll', function (e) {
+    scroll.set(window.scrollX, window.scrollY)
+  })
+}
+
+exports.screenSize = function () {
+  if(size) return size
+  size = new Vec2()
+  window.addEventListener('resize', function (e) {
+    size.set(window.innerWidth, window.innerHeight)
+  })
+  size.set(window.innerWidth, window.innerHeight)
+  return size
+}
+
+
+//if bind=true this will make the element
+//track the position of the Vec2,
+
+exports.absolute = function (el, bind) {
+  //if we are binding, it changes the layout rules
+  //for say, divs, so do that first.
+  if(bind)
+    el.style.position = 'absolute'
+
+  var absolute =
+    element(el, bind).subtract(element(el.parentElement))
+
+  if(bind) {
+    function place () {
+      el.style.left = absolute.x + 'px'
+      el.style.top  = absolute.y + 'px'
+    }
+    absolute.change(place)
+    el.style.bottom = ''
+    el.style.right  = ''
+  }
+  return absolute
+}
+
+
+},{"rec2":12,"vec2":14}],12:[function(require,module,exports){
+var Vec2 = require('vec2')
+
+var inherits = require('util').inherits
+
+inherits(Rec2, Vec2)
+
+module.exports = Rec2
+
+function Rec2 (x, y, w, h) {
+  if(!(this instanceof Rec2)) return new Rec2(x, y, w, h)
+  x = x || 0
+  y = y || 0
+  w = w || 0
+  h = h || 0
+  this.set(0, 0)
+  var self = this
+  var size = this.size = new Vec2(w, h)
+  var bound = this.bound = new Vec2(x + w)
+  var UPDATE = true
+  size.change(function (x, y) {
+    if(!UPDATE) return
+    if(x < 0 || y < 0)
+      throw new Error('size must be positive')
+    UPDATE = false
+    bound.set(self.x + size.x, self.y + size.y)
+    UPDATE = true
+  })
+  bound.change(function (x, y) {
+    if(!UPDATE) return
+    UPDATE = false
+    size.set(bound.x - self.x, bound.y - self.y)
+    UPDATE = true
+  })
+  this.change(function (x, y) {
+    bound.set(self.x + self.size.x, self.y + self.size.y)
+  })
+}
+
+var R = Rec2.prototype
+
+R.contains = function (point) {
+  return (
+    this.x <= point.x && point.x <= this.bound.x 
+  &&
+    this.y <= point.y && point.y <= this.bound.y   
+  )
+}
+
+R.collides = function (box) {
+  return (
+      (this.x <= box.x       && box.x       <= this.bound.x
+    || this.x <= box.bound.x && box.bound.x <= this.bound.x)
+    &&(this.y <= box.y       &&       box.y <= this.bound.y
+    || this.y <= box.bound.y && box.bound.y <= this.bound.y)
+  )
+}
+
+R.area = function () {
+  return this.size.x * this.size.y
+}
+
+},{"util":24,"vec2":13}],13:[function(require,module,exports){
+;(function inject(clean, precision, undef) {
+
+  function Vec2(x, y) {
+    if (!(this instanceof Vec2)) {
+      return new Vec2(x, y);
+    }
+    this.set(x || 0, y || 0);
+  };
+
+  Vec2.prototype = {
+    change : function(fn) {
+      if (fn) {
+        if (this.observers) {
+          this.observers.push(fn);
+        } else {
+          this.observers = [fn];
+        }
+      } else if (this.observers) {
+        for (var i=this.observers.length-1; i>=0; i--) {
+          this.observers[i](this);
+        }
+      }
+
+      return this;
+    },
+
+    ignore : function(fn) {
+      this.observers = this.observers.filter(function(cb) {
+        return cb !== fn;
+      });
+
+      return this;
+    },
+
+    dirty : function() {
+      var cacheKeys = ['__cachedLength', '__cachedLengthSquared'];
+      for (var i=0, l=cacheKeys.length; i<l; i++) {
+        this[cacheKeys[i]] = null;
+      }
+    },
+
+    // set x and y
+    set: function(x, y, silent) {
+      if(x && 'object' === typeof x) {
+        silent = y;
+        y = x.y;
+        x = x.x;
+      }
+      x = Vec2.clean(x)
+      y = Vec2.clean(y)
+      if(this.x === x && this.y === y)
+        return this;
+      this.x = x;
+      this.y = y;
+      this.dirty();
+      if(silent !== false)
+        return this.change();
+    },
+
+    // reset x and y to zero
+    zero : function() {
+      return this.set(0, 0);
+    },
+
+    // return a new vector with the same component values
+    // as this one
+    clone : function() {
+      return new Vec2(this.x, this.y);
+    },
+
+    // negate the values of this vector
+    negate : function(returnNew) {
+      if (returnNew) {
+        return new Vec2(-this.x, -this.y);
+      } else {
+        return this.set(-this.x, -this.y);
+      }
+    },
+
+    // Add the incoming `vec2` vector to this vector
+    add : function(vec2, returnNew) {
+      if (!returnNew) {
+        return this.set(this.x + vec2.x, this.y + vec2.y);
+      } else {
+        // Return a new vector if `returnNew` is truthy
+        return new Vec2(
+          this.x + vec2.x,
+          this.y + vec2.y
+        );
+      }
+    },
+
+    // Subtract the incoming `vec2` from this vector
+    subtract : function(vec2, returnNew) {
+      if (!returnNew) {
+        return this.set(this.x - vec2.x, this.y - vec2.y)
+      } else {
+        // Return a new vector if `returnNew` is truthy
+        return new Vec2(
+          this.x - vec2.x,
+          this.y - vec2.y
+        );
+      }
+    },
+
+    // Multiply this vector by the incoming `vec2`
+    multiply : function(vec2, returnNew) {
+      var x,y;
+      if (vec2.x !== undef) {
+        x = vec2.x;
+        y = vec2.y;
+
+      // Handle incoming scalars
+      } else {
+        x = y = vec2;
+      }
+
+      if (!returnNew) {
+        return this.set(this.x * x, this.y * y);
+      } else {
+        return new Vec2(
+          this.x * x,
+          this.y * y
+        );
+      }
+    },
+
+    // Rotate this vector. Accepts a `Rotation` or angle in radians.
+    //
+    // Passing a truthy `inverse` will cause the rotation to
+    // be reversed.
+    //
+    // If `returnNew` is truthy, a new
+    // `Vec2` will be created with the values resulting from
+    // the rotation. Otherwise the rotation will be applied
+    // to this vector directly, and this vector will be returned.
+    rotate : function(r, inverse, returnNew) {
+      var
+      x = this.x,
+      y = this.y,
+      cos = Math.cos(r),
+      sin = Math.sin(r),
+      rx, ry;
+
+      inverse = (inverse) ? -1 : 1;
+
+      rx = cos * x - (inverse * sin) * y;
+      ry = (inverse * sin) * x + cos * y;
+
+      if (returnNew) {
+        return new Vec2(rx, ry);
+      } else {
+        return this.set(rx, ry);
+      }
+    },
+
+    // Calculate the length of this vector
+    __cachedLength : null,
+    length : function() {
+      if (this.__cachedLength === null) {
+        var x = this.x, y = this.y;
+        this.__cachedLength = Math.sqrt(x * x + y * y);
+      }
+      return this.__cachedLength
+    },
+
+    // Get the length squared. For performance, use this instead of `Vec2#length` (if possible).
+    __cachedLengthSquared : null,
+    lengthSquared : function() {
+      if (this.__cachedLengthSquared === null) {
+        var x = this.x, y = this.y;
+        this.__cachedLengthSquared = Vec2.clean(x * x + y * y);
+      }
+      return this.__cachedLengthSquared;
+    },
+
+    // Return the distance betwen this `Vec2` and the incoming vec2 vector
+    // and return a scalar
+    distance : function(vec2) {
+      return this.subtract(vec2, true).length();
+    },
+
+    // Convert this vector into a unit vector.
+    // Returns the length.
+    normalize : function(returnNew) {
+      var length = this.length();
+
+      // Collect a ratio to shrink the x and y coords
+      var invertedLength = (length < Number.MIN_VALUE) ? 0 : 1/length;
+
+      if (!returnNew) {
+        // Convert the coords to be greater than zero
+        // but smaller than or equal to 1.0
+        return this.set(this.x * invertedLength, this.y * invertedLength);
+      } else {
+        return new Vec2(this.x * invertedLength, this.y * invertedLength)
+      }
+    },
+
+    // Determine if another `Vec2`'s components match this one's
+    // also accepts 2 scalars
+    equal : function(v, w) {
+      if (w === undef) {
+        return (
+          this.x === v.x &&
+          this.y == v.y
+        );
+      } else {
+        return (
+          this.x === v &&
+          this.y === w
+        )
+      }
+    },
+
+    // Return a new `Vec2` that contains the absolute value of
+    // each of this vector's parts
+    abs : function(returnNew) {
+      var x = Math.abs(this.x), y = Math.abs(this.y);
+
+      if (returnNew) {
+        return new Vec2(x, y);
+      } else {
+        return this.set(x, y);
+      }
+    },
+
+    // Return a new `Vec2` consisting of the smallest values
+    // from this vector and the incoming
+    //
+    // When returnNew is truthy, a new `Vec2` will be returned
+    // otherwise the minimum values in either this or `v` will
+    // be applied to this vector.
+    min : function(v, returnNew) {
+      var
+      tx = this.x,
+      ty = this.y,
+      vx = v.x,
+      vy = v.y,
+      x = tx < vx ? tx : vx,
+      y = ty < vy ? ty : vy;
+
+      if (returnNew) {
+        return new Vec2(x, y);
+      } else {
+        return this.set(x, y);
+      }
+    },
+
+    // Return a new `Vec2` consisting of the largest values
+    // from this vector and the incoming
+    //
+    // When returnNew is truthy, a new `Vec2` will be returned
+    // otherwise the minimum values in either this or `v` will
+    // be applied to this vector.
+    max : function(v, returnNew) {
+      var
+      tx = this.x,
+      ty = this.y,
+      vx = v.x,
+      vy = v.y,
+      x = tx > vx ? tx : vx,
+      y = ty > vy ? ty : vy;
+
+      if (returnNew) {
+        return new Vec2(x, y);
+      } else {
+        return this.set(x, y);
+      }
+    },
+
+    // Clamp values into a range.
+    // If this vector's values are lower than the `low`'s
+    // values, then raise them.  If they are higher than
+    // `high`'s then lower them.
+    //
+    // Passing returnNew as true will cause a new Vec2 to be
+    // returned.  Otherwise, this vector's values will be clamped
+    clamp : function(low, high, returnNew) {
+      var ret = this.min(high, true).max(low)
+      if (returnNew) {
+        return ret;
+      } else {
+        return this.set(ret.x, ret.y);
+      }
+    },
+
+    // Perform linear interpolation between two vectors
+    // amount is a decimal between 0 and 1
+    lerp : function(vec, amount) {
+      return this.add(vec.subtract(this, true).multiply(amount), true);
+    },
+
+    // Get the skew vector such that dot(skew_vec, other) == cross(vec, other)
+    skew : function() {
+      // Returns a new vector.
+      return new Vec2(-this.y, this.x)
+    },
+
+    // calculate the dot product between
+    // this vector and the incoming
+    dot : function(b) {
+      return Vec2.clean(this.x * b.x + b.y * this.y);
+    },
+
+    // calculate the perpendicular dot product between
+    // this vector and the incoming
+    perpDot : function(b) {
+      return Vec2.clean(this.x * b.y - this.y * b.x)
+    },
+
+    // Determine the angle between two vec2s
+    angleTo : function(vec) {
+      return Math.atan2(this.perpDot(vec), this.dot(vec));
+    },
+
+    // Divide this vector's components by a scalar
+    divide : function(scalar, returnNew) {
+      if (scalar === 0 || isNaN(scalar)) {
+        throw new Error('division by zero')
+      }
+
+      if (returnNew) {
+        return new Vec2(this.x/scalar, this.y/scalar);
+      }
+
+      return this.set(this.x / scalar, this.y / scalar);
+    },
+
+    toArray: function() {
+      return [this.x, this.y];
+    },
+
+    fromArray: function(array) {
+      return this.set(array[0], array[1]);
+    },
+    toJSON: function () {
+      return {x: this.x, y: this.y}
+    }
+  };
+
+  Vec2.fromArray = function(array) {
+    return new Vec2(array[0], array[1]);
+  };
+
+  // Floating point stability
+  Vec2.precision = precision || 8;
+  var p = Math.pow(10, Vec2.precision)
+
+  Vec2.clean = clean || function(val) {
+    if (isNaN(val)) {
+      throw new Error('NaN detected')
+    }
+
+    if (!isFinite(val)) {
+      throw new Error('Infinity detected');
+    }
+
+    if(Math.round(val) === val) {
+      return val;
+    }
+
+    return Math.round(val * p)/p;
+  };
+  Vec2.inject = inject;
+
+  // Expose, but also allow creating a fresh Vec2 subclass.
+  if (typeof module !== 'undefined' && typeof module.exports == 'object') {
+    module.exports = Vec2;
+  } else {
+    window.Vec2 = window.Vec2 || Vec2;
+  }
+  return Vec2
+})();
+
+
+
+},{}],14:[function(require,module,exports){
+module.exports=require(13)
+},{}],15:[function(require,module,exports){
+var Vec2 = require('vec2')
+var Rec2 = require('rec2')
+var h = require('hyperscript')
+var vdom = require('vec2-dom')
+module.exports = Layer
+
+var L = null
+
+function px(n) {
+  if('number' === typeof n)
+    return n + 'px'
+  else return n || '0px'
+}
+
+function Layer (opts) {
+  opts = opts || {}
+  this.size = opts.size || new Vec2(1024, 1024)
+  this.scale = opts.scale || 1
+  
+  //tile size on map scale
+  //defaults to degrees lat and long?
+  console.log('SCALE', this.scale,  Math.pow(2, this.scale), 1024 / Math.pow(2, this.scale))
+  this.tileScale = new Vec2(1024/Math.pow(2, this.scale), 1024/Math.pow(2, this.scale))
+                //south west to north east
+
+  this.min = new Rec2().set(0, 0)
+  this.max = this.min.bound.set(1024, 1024)
+
+  this.minTile = new Vec2()
+  this.maxTile = new Vec2()
+  this.tileWidth = new Vec2()
+  //tile size in pixels
+  this.tileSize = new Vec2(256, 256)
+  this.tiles = {}
+  if('undefined' !== typeof window) {
+    this.div = h('div', {
+      style: {
+        //'pointer-events' : 'none',
+        left             : px(0),
+        top              : px(0),
+        'z-index'        : this.scale,
+        position         : 'absolute',
+        margin           : px(0),
+        padding          : px(0),
+        width            : px(this.size.x),
+        height           : px(this.size.y),
+        overflow         : 'hidden'
+      }
+    })
+    var self = this
+    this.size.change(function () {
+      div.size.width  = px(self.size.x)
+      div.size.height = px(self.size.y)
+    })
+  }
+}
+
+var l = Layer.prototype
+
+l.tileRange = function (min, max) {
+  max = min.bound || max
+
+  var maxX = Math.floor((this.max.x - this.min.x) / this.tileScale.x) - 1
+  var maxY = Math.floor((this.max.y - this.min.y) / this.tileScale.x) - 1
+
+  this.minTile.set(
+    Math.max(Math.floor(min.x / this.tileScale.x), 0),
+    Math.max(Math.floor(min.y / this.tileScale.y), 0)
+  )
+
+  this.maxTile.set(
+    Math.min(Math.floor(Math.max(max.x, 0) / this.tileScale.x), maxX),
+    Math.min(Math.floor(Math.max(max.y, 0) / this.tileScale.y), maxY)
+  )
+  
+  return this
+}
+
+
+l.getTile = function (x, y, z) {
+  /*
+  //baidu
+  var src = 'http://online1.map.bdimg.com/tile/?qt=tile'
+    + '&x=' + x
+    + '&y=' + y
+    + '&z=' + z
+    + '&styles=pl&udt=20131108'
+  ;
+  */
+
+  //google
+  var src = 'https://khms1.google.com/kh/v=134&src=app'
+          + '&x=' + x
+          + '&y=' + y
+          + '&z=' + z
+          + '&s=G'
+  ;
+
+  var img
+  return img = h('img', {src: src, style: { left: px(0), top: px(0) }})
+}
+
+l.add = function (x, y) {
+  var id = x+':'+y
+  if(this.tiles[id]) return false
+
+  var z = this.scale
+
+  var img = this.getTile(x, y, z)
+  img.id = x+'_'+y+'_'+z
+  img.style['pointer-events'] = 'none'
+
+  this.div.appendChild(img)
+  var r = vdom.absolute(img, true)
+
+  img.screenOrigin = r
+  this.tiles[id] = img
+
+  img.pos = new Vec2(x, y)
+  img.worldOrigin = new Vec2(
+    this.min.x + this.tileScale.x*x,
+    this.min.y + this.tileScale.y*y
+  )
+  return img
+}
+
+l.remove = function (x, y) {
+  var k = x + ':' + y
+  var img = this.tiles[k]
+  delete this.tiles[k]
+  this.div.removeChild(img)
+  return this
+}
+
+l.show = function (show) {
+  this.div.style.display = show ? 'block' : 'none'
+}
+
+var o = new Vec2()
+  var unit = new Vec2(1, 1)
+
+l.update = function (min, max, zoom) {
+
+  this.tileRange(min, max)
+
+  this.tileWidth.set(
+    Math.floor(this.tileSize.x*zoom.x),
+    Math.floor(this.tileSize.x*zoom.y)
+  )
+
+  var m = this.minTile, M = this.maxTile
+  //NOTE.textContent += '\n' + JSON.stringify({min: m, max: M})
+
+  for(var i =  m.x; i <= M.x; i++)
+    for(var j =  m.y; j <= M.y; j++)
+      this.add(i, j)
+
+  for(var k in this.tiles) {
+    var img = this.tiles[k]
+
+    if(
+      img.pos.x < m.x || img.pos.y < m.y ||
+      img.pos.x > M.x || img.pos.y > M.y
+    ) {
+      this.remove(img.pos.x, img.pos.y)
+    } else {
+
+    var sx = this.tileScale.x/2
+    var sy = this.tileScale.y/2
+
+      img.screenOrigin.set(
+        ((img.worldOrigin.x - min.x) / sx)
+          * this.tileSize.x * zoom.x ,
+        ((img.worldOrigin.y - (this.min.y - (this.min.y - min.y))) 
+          / sy)
+          * this.tileSize.y * zoom.y
+      )
+
+      img.screenOrigin.set(
+        (img.worldOrigin.x - min.x) * zoom.x,
+        (img.worldOrigin.y - min.y) * zoom.y
+      )
+
+
+      //TODO: create a vec2 thing that allows you to apply many calcs like this:
+      // 
+      //  V(img.worldOrigin, this.min, min, this.tileScale, this.tileSize, zoom,
+      //    '((worldOrigin - (_min - (_min - min))) / tileScale) * tileSize * 1/zoom)' 
+      //   )
+      // it would generate a function that applies this directly, so you don't have
+      // to type it out twice.
+
+
+      var scaleFactor = Math.pow(2, this.scale - 1)
+
+      img.screenOrigin.size.set(
+        (this.tileSize.x * zoom.x * 2)/scaleFactor,
+        (this.tileSize.y * zoom.y * 2)/scaleFactor
+      )
+    }
+  }
+  return this
+}
+
+
+},{"hyperscript":3,"rec2":20,"vec2":22,"vec2-dom":11}],16:[function(require,module,exports){
+var Vec2    = require('vec2')
+var Rec2    = require('rec2')
+
+var movement = require('./movement')
+
+//Aha, a vector layer just manages tiles...
+//you can change: it's dimensions, size, and zoom.
+
+function isFunction (f) {
+  return 'function' === typeof f
+}
+
+module.exports = View
+  
+function View (scale) {
+  if(!(this instanceof View)) return new View(scale)
+  //absolute center. move this to view another part of the graph
+  this.center = new Vec2()
+  //conversion between model units and screen units.
+  //it is up to the user to select a sensible defaut for the zoom settings.
+  this.zoom = new Vec2().set(1, 1)
+
+  this.scale = scale || 1
+  this.listeners = []
+  //the size of the view, from top-left to bottom-right
+  //this is set to the size of the canvas (for example)
+
+  var view = this.view = new Vec2()
+  var world = this.world = new Rec2()
+  var worldMax = this.worldMax = this.world.bound
+  var self = this
+
+  function update () {
+    var hx = self.view.x / 2, hy = self.view.y / 2
+    var ix = 1/self.zoom.x, iy = 1/self.zoom.y
+
+    self.world.set(
+      self.center.x - hx*ix,
+      self.center.y - hy*iy
+    )
+
+    self.worldMax.set(
+      self.world.x + self.view.x * ix,
+      self.world.y + self.view.y * iy
+    )
+
+    self.listeners.forEach(function (l) { l() })
+  }
+
+  this.center.change(update)
+  this.zoom.change(update)
+  this.view.change(update)
+}
+
+function divide (v, u) {
+  v.set(v.x / u.x, v.y / u.y)
+  return v
+}
+
+var proto = View.prototype
+proto.toModel = function (v, u) {
+  u = u || new Vec2()
+  return u.set((this.screen.x - v.x) * (1/this.zoom.x), (this.screen.y - v.y) * (1/this.zoom.y))
+}
+
+proto.toView = function (v, u) {
+  //handle scalars also
+  if('number' === typeof v)
+    return v * (this.zoom.x + this.zoom.y)/2
+  u = u || new Vec2()
+
+  return u.set(
+    (v.x - this.center.x) * this.zoom.x + this.view.x*0.5,
+    (v.y - this.center.y) * this.zoom.y + this.view.y*0.5
+  )
+}
+
+proto.change = function (listener) {
+  this.listeners = this.listeners || []
+  this.listeners.push(listener)
+  return this 
+}
+
+proto.ignore = function (listener) {
+  var i = this.listeners.indexOf(listener)
+  if(~i) this.listeners.splice(i, 1)
+  return !!~i
+}
+
+proto.track = function (canvas, opts) {
+  var self = this
+  if(canvas.center && isFunction(canvas._zoom)) {
+    canvas.change(function () {
+      self.center.set(canvas.center)
+      self._zoom(canvas._zoom() * self.scale)
+      self.view.set(canvas.view)
+    })
+  } else
+    movement(this, canvas, opts)
+  return this
+}
+
+},{"./movement":17,"rec2":20,"vec2":19}],17:[function(require,module,exports){
+var Vec2 = require('vec2')
+var Touch = require('vec2-touch')
+
+function isNumber(n) {
+  return 'number' === typeof n
+}
+
+function isFunction (f) {
+  return 'function' === typeof f
+}
+
+module.exports = function (view, canvas, opts) {
+
+  //the example is with a canvas,
+  //but this will work the same with
+  //dom or svg whatever
+
+  var rect = isFunction(canvas.getBoundingClientRect)
+    ? canvas.getBoundingClientRect()
+    : rect
+
+//  if(isNumber(rect.width) && isNumber(rect.height))
+//    view.view.set(rect.width, rect.height)
+
+  Touch(canvas, function (t) {
+    t.event.preventDefault()
+    var _t = t.clone(), diff = t.clone()
+
+    t.change(function () {
+      //if you hold the shift key and drag, zoom instead of moving.
+
+      diff.set(
+        (_t.x - t.x) / view.zoom.x,
+        (_t.y - t.y) / view.zoom.y
+      )
+      var z = _t.y - t.y
+      _t.set(t)
+      if(t.event.shiftKey) {
+        view.zoom.set(view.zoom.x * ((100 + z) / 100), view.zoom.y * ((100 + z) / 100))
+      } else {
+        view.center.add(diff)
+      }
+    })
+  }, {})
+
+
+  var keys = {
+    '39': 'right',
+    '37': 'left',
+    '38': 'up',
+    '40': 'down',
+    '187': '+',
+    '189': '-'
+  }
+  var v = new Vec2()
+
+  window.addEventListener('keydown', function (e) {
+    var motion = keys[e.keyCode]
+    if(!motion) return
+
+    var m = '+' === motion ? 1.25 : '-' === motion ? 0.8 : 0
+    if(m)
+      return view.zoom.set(view.zoom.x * m, view.zoom.y * m)
+
+    if('right' === motion) v.set(1,  0)
+    if('left'  === motion) v.set(-1,  0)
+    if('up'    === motion) v.set( 0,  -1)
+    if('down'  === motion) v.set( 0, 1)
+
+    e.preventDefault()
+    view.center.set(
+      view.center.x + ((v.x*20) * 1/view.zoom.x),
+      view.center.y + ((v.y*20) * 1/view.zoom.y)
+    )
+  })
+
+}
+
+},{"vec2":19,"vec2-touch":18}],18:[function(require,module,exports){
+var Vec2 = require('vec2')
+
+Touch.prototype = new Vec2()
+
+function Touch () {
+  //browsers optimise properties set in the contructor.
+  this.force = 0   ; this.event = null ; this.target = null;
+  this.start = true; this.end   = false; this.type = 'init'
+}
+
+// should not be called by user.
+// only browser should move touches.
+Touch.prototype._update = function (e, ev) {
+  ev = ev || e
+  this.force  = (
+    e.force || e.webkitForce || 
+    Math.min((1 + ev.ctrlKey + ev.altKey + ev.shiftKey) / 3, 1)
+  )
+
+  this.event  = ev
+  this.id     = e.identifier != null ? e.identifier : -1
+  this.target = e.target
+  this.type   = ev.type
+  this.end = /(end|up)$/.test(this.type)
+  this.set(e.clientX, e.clientY)
+
+  if(this.end) {
+    this.change()
+    this.observers = [] //deregister listeners
+  }
+  return this
+}
+
+module.exports = function (el, handler, opts) {
+
+  if('function' === typeof el)
+    handler = el, el = document.documentElement, opts = handler || {}
+  
+  var touches = []
+
+  function each(iter) {
+    return function (ev) {
+      [].forEach.call(ev.changedTouches,  function (e) { iter(e, ev) }) 
+      if(opts.preventDefault)
+        ev.preventDefault()
+    }
+  }
+
+  var touchStart = each(function (e, ev) {
+    handler(touches[e.identifier] = new Touch()._update(e, ev), touches)
+  })
+
+  var touchMove = each(function (e, ev) {
+    touches[e.identifier]._update(e, ev)
+  })
+
+  var touchEnd = each(function (e, ev) {
+    touches[e.identifier]._update(e, ev)
+    delete touches[e.identifier]
+  })
+
+  el.addEventListener('touchstart',    touchStart)
+  el.addEventListener('touchmove',     touchMove)
+  el.addEventListener('touchend',      touchEnd)
+  el.addEventListener('MozTouchStart', touchStart)
+  el.addEventListener('MozTouchMove',  touchMove)
+  el.addEventListener('MozTouchEnd',   touchEnd)
+  
+  if(opts.mouse !== false) {
+    var down = false
+    el.addEventListener('mousedown', function (ev) {
+      down = true
+      handler(touches[-1] = new Touch()._update(ev), touches)
+    }) 
+    el.addEventListener('mousemove', function (ev) {
+      if(!down) return
+      touches[-1]._update(ev)
+    })
+    el.addEventListener('mouseup',   function (ev) {
+      down = false
+      if(!touches[-1]) return
+      touches[-1]._update(ev)    
+      delete touches[-1]
+    }) 
+  }
+
+  return touches
+}
+
+
+},{"vec2":19}],19:[function(require,module,exports){
 ;(function inject(clean, precision, undef) {
 
   function Vec2(x, y) {
@@ -396,870 +2181,7 @@
 
 
 
-},{}],2:[function(require,module,exports){
-
-var map = require('./')()
-
-map.style.width = window.innerWidth + 'px'
-map.style.height = window.innerHeight + 'px'
-
-document.body.appendChild(map)
-
-
-
-},{"./":3}],3:[function(require,module,exports){
-var h    = require('hyperscript')
-var Vec2 = require('vec2')
-var vdom = require('vec2-dom')
-var View = require('vec2-view')
-
-function Layer (zoom) {
-  this.zoom = zoom
-  this.tiles = {}
-}
-
-var l = Layer.prototype
-
-module.exports = function () {
-
-  var div  = h('div.vec2-map', {style: {overflow: 'hidden'}})
-  var tiles = {}
-
-  function getTile(x, y, z, cb) {
-    var id = x+':'+y
-    if(tiles[id]) return false
-
-    var src = 'https://khms1.google.com/kh/v=134&src=app'
-            + '&x=' + x
-            + '&y=' + y
-            + '&z=' + z
-            + '&s=G'
-    ;
-
-    var img = h('img', {src: src, style: {'pointer-events': 'none'}})
-    div.appendChild(img)
-    var r = vdom.absolute(img, true)
-
-    img.screenOrigin = r
-    tiles[id] = img
-
-    if(cb)
-      img.addEventListener('load', function (e) {
-        cb(null, img)
-      })
-
-    img.origin = new Vec2(x, y)
-    return img
-  }
-
-  function round (v) {
-    v.set(Math.round(v.x), Math.round(v.y))
-    return v
-  }
-
-  var view = new View().track(div)
-  view.view.set(window.innerWidth, window.innerHeight)
-  view.zoom(256)
-  var Z = 1
-
-  //get screen dimensions
-  //get the screen in the model
-
-  view.screenModel = new Vec2()
-
-  var screenSize = view.view.divide(view.zoom(), true)
-  var screenMin = view.center.add(screenSize, true)
-  var screenMax = view.center.subtract(screenSize, true)
-
-  view.change(function (e) {
-    screenSize.set(view.view).divide(view.zoom())
-    screenMax.set(view.center).add(screenSize)
-    screenMin.set(view.center).subtract(screenSize)
-
-    var mX = Math.max(Math.floor(screenMin.x), 0)
-    var mY = Math.max(Math.floor(screenMin.y), 0)
-    var MX = Math.min(Math.floor(screenMax.x), Math.pow(2, Z) - 1)
-    var MY = Math.min(Math.floor(screenMax.y), Math.pow(2, Z) - 1)
-
-    //console.log('MAX',  Math.pow(2, Z))
-
-    for(var i =  mX; i <= MX; i++)
-      for(var j =  mY; j <= MY; j++)
-        if(getTile(i, j, Z)) console.log(i, j)
-    
-
-    for(var k in tiles) {
-      var img = tiles[k]
-      img.screenOrigin.set(round(view.toView(img.origin)))
-      img.style.width = Math.floor(view.zoom()) + 'px'
-    }
-
-    var z = Math.log(view.zoom()/256)/Math.LN2
-    console.log(z)
-
-  })
-  return div
-}
-
-},{"hyperscript":4,"vec2":1,"vec2-dom":12,"vec2-view":15}],4:[function(require,module,exports){
-var split = require('browser-split')
-var ClassList = require('class-list')
-var DataSet = require('data-set')
-require('html-element')
-
-module.exports = h
-
-function h() {
-  var args = [].slice.call(arguments), e = null
-  function item (l) {
-    var r
-    function parseClass (string) {
-      var m = split(string, /([\.#]?[a-zA-Z0-9_-]+)/)
-      forEach(m, function (v) {
-        var s = v.substring(1,v.length)
-        if(!v) return
-        if(!e)
-          e = document.createElement(v)
-        else if (v[0] === '.')
-          ClassList(e).add(s)
-        else if (v[0] === '#')
-          e.setAttribute('id', s)
-      })
-    }
-
-    if(l == null)
-      ;
-    else if('string' === typeof l) {
-      if(!e)
-        parseClass(l)
-      else
-        e.appendChild(r = document.createTextNode(l))
-    }
-    else if('number' === typeof l
-      || 'boolean' === typeof l
-      || l instanceof Date
-      || l instanceof RegExp ) {
-        e.appendChild(r = document.createTextNode(l.toString()))
-    }
-    //there might be a better way to handle this...
-    else if (isArray(l))
-      forEach(l, item)
-    else if(isNode(l))
-      e.appendChild(r = l)
-    else if(l instanceof Text)
-      e.appendChild(r = l)
-    else if ('object' === typeof l) {
-      for (var k in l) {
-        if('function' === typeof l[k]) {
-          if(/^on\w+/.test(k)) {
-            e.addEventListener
-              ? e.addEventListener(k.substring(2), l[k], false)
-              : e.attachEvent(k, l[k])
-          } else {
-            e[k] = l[k]()
-            l[k](function (v) {
-              e[k] = v
-            })
-          }
-        }
-        else if(k === 'style') {
-          if('string' === typeof l[k]) {
-            e.style.cssText = l[k]
-          } else {
-            for (var s in l[k]) (function(s, v) {
-              if('function' === typeof v) {
-                e.style.setProperty(s, v())
-                v(function (val) {
-                  e.style.setProperty(s, val)
-                })
-              } else
-                e.style.setProperty(s, l[k][s])
-            })(s, l[k][s])
-          }
-        } else if (k.substr(0, 5) === "data-") {
-          DataSet(e)[k.substr(5)] = l[k]
-        } else {
-          e[k] = l[k]
-        }
-      }
-    } else if ('function' === typeof l) {
-      //assume it's an observable!
-      var v = l()
-      e.appendChild(r = isNode(v) ? v : document.createTextNode(v))
-
-      l(function (v) {
-        if(isNode(v) && r.parentElement)
-          r.parentElement.replaceChild(v, r), r = v
-        else
-          r.textContent = v
-      })
-
-    }
-
-    return r
-  }
-  while(args.length)
-    item(args.shift())
-
-  return e
-}
-
-function isNode (el) {
-  return el && el.nodeName && el.nodeType
-}
-
-function isText (el) {
-  return el && el.nodeName === '#text' && el.nodeType == 3
-}
-
-function forEach (arr, fn) {
-  if (arr.forEach) return arr.forEach(fn)
-  for (var i = 0; i < arr.length; i++) fn(arr[i], i)
-}
-
-function isArray (arr) {
-  return Object.prototype.toString.call(arr) == '[object Array]'
-}
-
-},{"browser-split":5,"class-list":6,"data-set":8,"html-element":22}],5:[function(require,module,exports){
-/*!
- * Cross-Browser Split 1.1.1
- * Copyright 2007-2012 Steven Levithan <stevenlevithan.com>
- * Available under the MIT License
- * ECMAScript compliant, uniform cross-browser split method
- */
-
-/**
- * Splits a string into an array of strings using a regex or string separator. Matches of the
- * separator are not included in the result array. However, if `separator` is a regex that contains
- * capturing groups, backreferences are spliced into the result each time `separator` is matched.
- * Fixes browser bugs compared to the native `String.prototype.split` and can be used reliably
- * cross-browser.
- * @param {String} str String to split.
- * @param {RegExp|String} separator Regex or string to use for separating the string.
- * @param {Number} [limit] Maximum number of items to include in the result array.
- * @returns {Array} Array of substrings.
- * @example
- *
- * // Basic use
- * split('a b c d', ' ');
- * // -> ['a', 'b', 'c', 'd']
- *
- * // With limit
- * split('a b c d', ' ', 2);
- * // -> ['a', 'b']
- *
- * // Backreferences in result array
- * split('..word1 word2..', /([a-z]+)(\d+)/i);
- * // -> ['..', 'word', '1', ' ', 'word', '2', '..']
- */
-module.exports = (function split(undef) {
-
-  var nativeSplit = String.prototype.split,
-    compliantExecNpcg = /()??/.exec("")[1] === undef,
-    // NPCG: nonparticipating capturing group
-    self;
-
-  self = function(str, separator, limit) {
-    // If `separator` is not a regex, use `nativeSplit`
-    if (Object.prototype.toString.call(separator) !== "[object RegExp]") {
-      return nativeSplit.call(str, separator, limit);
-    }
-    var output = [],
-      flags = (separator.ignoreCase ? "i" : "") + (separator.multiline ? "m" : "") + (separator.extended ? "x" : "") + // Proposed for ES6
-      (separator.sticky ? "y" : ""),
-      // Firefox 3+
-      lastLastIndex = 0,
-      // Make `global` and avoid `lastIndex` issues by working with a copy
-      separator = new RegExp(separator.source, flags + "g"),
-      separator2, match, lastIndex, lastLength;
-    str += ""; // Type-convert
-    if (!compliantExecNpcg) {
-      // Doesn't need flags gy, but they don't hurt
-      separator2 = new RegExp("^" + separator.source + "$(?!\\s)", flags);
-    }
-    /* Values for `limit`, per the spec:
-     * If undefined: 4294967295 // Math.pow(2, 32) - 1
-     * If 0, Infinity, or NaN: 0
-     * If positive number: limit = Math.floor(limit); if (limit > 4294967295) limit -= 4294967296;
-     * If negative number: 4294967296 - Math.floor(Math.abs(limit))
-     * If other: Type-convert, then use the above rules
-     */
-    limit = limit === undef ? -1 >>> 0 : // Math.pow(2, 32) - 1
-    limit >>> 0; // ToUint32(limit)
-    while (match = separator.exec(str)) {
-      // `separator.lastIndex` is not reliable cross-browser
-      lastIndex = match.index + match[0].length;
-      if (lastIndex > lastLastIndex) {
-        output.push(str.slice(lastLastIndex, match.index));
-        // Fix browsers whose `exec` methods don't consistently return `undefined` for
-        // nonparticipating capturing groups
-        if (!compliantExecNpcg && match.length > 1) {
-          match[0].replace(separator2, function() {
-            for (var i = 1; i < arguments.length - 2; i++) {
-              if (arguments[i] === undef) {
-                match[i] = undef;
-              }
-            }
-          });
-        }
-        if (match.length > 1 && match.index < str.length) {
-          Array.prototype.push.apply(output, match.slice(1));
-        }
-        lastLength = match[0].length;
-        lastLastIndex = lastIndex;
-        if (output.length >= limit) {
-          break;
-        }
-      }
-      if (separator.lastIndex === match.index) {
-        separator.lastIndex++; // Avoid an infinite loop
-      }
-    }
-    if (lastLastIndex === str.length) {
-      if (lastLength || !separator.test("")) {
-        output.push("");
-      }
-    } else {
-      output.push(str.slice(lastLastIndex));
-    }
-    return output.length > limit ? output.slice(0, limit) : output;
-  };
-
-  return self;
-})();
-
-},{}],6:[function(require,module,exports){
-// contains, add, remove, toggle
-var indexof = require('indexof')
-
-module.exports = ClassList
-
-function ClassList(elem) {
-    var cl = elem.classList
-
-    if (cl) {
-        return cl
-    }
-
-    var classList = {
-        add: add
-        , remove: remove
-        , contains: contains
-        , toggle: toggle
-        , toString: $toString
-        , length: 0
-        , item: item
-    }
-
-    return classList
-
-    function add(token) {
-        var list = getTokens()
-        if (indexof(list, token) > -1) {
-            return
-        }
-        list.push(token)
-        setTokens(list)
-    }
-
-    function remove(token) {
-        var list = getTokens()
-            , index = indexof(list, token)
-
-        if (index === -1) {
-            return
-        }
-
-        list.splice(index, 1)
-        setTokens(list)
-    }
-
-    function contains(token) {
-        return indexof(getTokens(), token) > -1
-    }
-
-    function toggle(token) {
-        if (contains(token)) {
-            remove(token)
-            return false
-        } else {
-            add(token)
-            return true
-        }
-    }
-
-    function $toString() {
-        return elem.className
-    }
-
-    function item(index) {
-        var tokens = getTokens()
-        return tokens[index] || null
-    }
-
-    function getTokens() {
-        var className = elem.className
-
-        return filter(className.split(" "), isTruthy)
-    }
-
-    function setTokens(list) {
-        var length = list.length
-
-        elem.className = list.join(" ")
-        classList.length = length
-
-        for (var i = 0; i < list.length; i++) {
-            classList[i] = list[i]
-        }
-
-        delete list[length]
-    }
-}
-
-function filter (arr, fn) {
-    var ret = []
-    for (var i = 0; i < arr.length; i++) {
-        if (fn(arr[i])) ret.push(arr[i])
-    }
-    return ret
-}
-
-function isTruthy(value) {
-    return !!value
-}
-
-},{"indexof":7}],7:[function(require,module,exports){
-
-var indexOf = [].indexOf;
-
-module.exports = function(arr, obj){
-  if (indexOf) return arr.indexOf(obj);
-  for (var i = 0; i < arr.length; ++i) {
-    if (arr[i] === obj) return i;
-  }
-  return -1;
-};
-},{}],8:[function(require,module,exports){
-var Weakmap = require("weakmap")
-var Individual = require("individual")
-
-var datasetMap = Individual("__DATA_SET_WEAKMAP", Weakmap())
-
-module.exports = DataSet
-
-function DataSet(elem) {
-    if (elem.dataset) {
-        return elem.dataset
-    }
-
-    var hash = datasetMap.get(elem)
-
-    if (!hash) {
-        hash = createHash(elem)
-        datasetMap.set(elem, hash)
-    }
-
-    return hash
-}
-
-function createHash(elem) {
-    var attributes = elem.attributes
-    var hash = {}
-
-    if (attributes === null || attributes === undefined) {
-        return hash
-    }
-
-    for (var i = 0; i < attributes.length; i++) {
-        var attr = attributes[i]
-
-        if (attr.name.substr(0,5) !== "data-") {
-            continue
-        }
-
-        hash[attr.name.substr(5)] = attr.value
-    }
-
-    return hash
-}
-
-},{"individual":9,"weakmap":11}],9:[function(require,module,exports){
-var root = require("global")
-
-module.exports = Individual
-
-function Individual(key, value) {
-    if (root[key]) {
-        return root[key]
-    }
-
-    Object.defineProperty(root, key, {
-        value: value
-        , configurable: true
-    })
-
-    return value
-}
-
-},{"global":10}],10:[function(require,module,exports){
-var global=typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {};/*global window, global*/
-if (typeof global !== "undefined") {
-    module.exports = global
-} else if (typeof window !== "undefined") {
-    module.exports = window
-}
-
-},{}],11:[function(require,module,exports){
-/* (The MIT License)
- *
- * Copyright (c) 2012 Brandon Benvie <http://bbenvie.com>
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
- * associated documentation files (the 'Software'), to deal in the Software without restriction,
- * including without limitation the rights to use, copy, modify, merge, publish, distribute,
- * sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included with all copies or
- * substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING
- * BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
- * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY  CLAIM,
- * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
- */
-
-// Original WeakMap implementation by Gozala @ https://gist.github.com/1269991
-// Updated and bugfixed by Raynos @ https://gist.github.com/1638059
-// Expanded by Benvie @ https://github.com/Benvie/harmony-collections
-
-void function(global, undefined_, undefined){
-  var getProps = Object.getOwnPropertyNames,
-      defProp  = Object.defineProperty,
-      toSource = Function.prototype.toString,
-      create   = Object.create,
-      hasOwn   = Object.prototype.hasOwnProperty,
-      funcName = /^\n?function\s?(\w*)?_?\(/;
-
-
-  function define(object, key, value){
-    if (typeof key === 'function') {
-      value = key;
-      key = nameOf(value).replace(/_$/, '');
-    }
-    return defProp(object, key, { configurable: true, writable: true, value: value });
-  }
-
-  function nameOf(func){
-    return typeof func !== 'function'
-          ? '' : 'name' in func
-          ? func.name : toSource.call(func).match(funcName)[1];
-  }
-
-  // ############
-  // ### Data ###
-  // ############
-
-  var Data = (function(){
-    var dataDesc = { value: { writable: true, value: undefined } },
-        datalock = 'return function(k){if(k===s)return l}',
-        uids     = create(null),
-
-        createUID = function(){
-          var key = Math.random().toString(36).slice(2);
-          return key in uids ? createUID() : uids[key] = key;
-        },
-
-        globalID = createUID(),
-
-        storage = function(obj){
-          if (hasOwn.call(obj, globalID))
-            return obj[globalID];
-
-          if (!Object.isExtensible(obj))
-            throw new TypeError("Object must be extensible");
-
-          var store = create(null);
-          defProp(obj, globalID, { value: store });
-          return store;
-        };
-
-    // common per-object storage area made visible by patching getOwnPropertyNames'
-    define(Object, function getOwnPropertyNames(obj){
-      var props = getProps(obj);
-      if (hasOwn.call(obj, globalID))
-        props.splice(props.indexOf(globalID), 1);
-      return props;
-    });
-
-    function Data(){
-      var puid = createUID(),
-          secret = {};
-
-      this.unlock = function(obj){
-        var store = storage(obj);
-        if (hasOwn.call(store, puid))
-          return store[puid](secret);
-
-        var data = create(null, dataDesc);
-        defProp(store, puid, {
-          value: new Function('s', 'l', datalock)(secret, data)
-        });
-        return data;
-      }
-    }
-
-    define(Data.prototype, function get(o){ return this.unlock(o).value });
-    define(Data.prototype, function set(o, v){ this.unlock(o).value = v });
-
-    return Data;
-  }());
-
-
-  var WM = (function(data){
-    var validate = function(key){
-      if (key == null || typeof key !== 'object' && typeof key !== 'function')
-        throw new TypeError("Invalid WeakMap key");
-    }
-
-    var wrap = function(collection, value){
-      var store = data.unlock(collection);
-      if (store.value)
-        throw new TypeError("Object is already a WeakMap");
-      store.value = value;
-    }
-
-    var unwrap = function(collection){
-      var storage = data.unlock(collection).value;
-      if (!storage)
-        throw new TypeError("WeakMap is not generic");
-      return storage;
-    }
-
-    var initialize = function(weakmap, iterable){
-      if (iterable !== null && typeof iterable === 'object' && typeof iterable.forEach === 'function') {
-        iterable.forEach(function(item, i){
-          if (item instanceof Array && item.length === 2)
-            set.call(weakmap, iterable[i][0], iterable[i][1]);
-        });
-      }
-    }
-
-
-    function WeakMap(iterable){
-      if (this === global || this == null || this === WeakMap.prototype)
-        return new WeakMap(iterable);
-
-      wrap(this, new Data);
-      initialize(this, iterable);
-    }
-
-    function get(key){
-      validate(key);
-      var value = unwrap(this).get(key);
-      return value === undefined_ ? undefined : value;
-    }
-
-    function set(key, value){
-      validate(key);
-      // store a token for explicit undefined so that "has" works correctly
-      unwrap(this).set(key, value === undefined ? undefined_ : value);
-    }
-
-    function has(key){
-      validate(key);
-      return unwrap(this).get(key) !== undefined;
-    }
-
-    function delete_(key){
-      validate(key);
-      var data = unwrap(this),
-          had = data.get(key) !== undefined;
-      data.set(key, undefined);
-      return had;
-    }
-
-    function toString(){
-      unwrap(this);
-      return '[object WeakMap]';
-    }
-
-    try {
-      var src = ('return '+delete_).replace('e_', '\\u0065'),
-          del = new Function('unwrap', 'validate', src)(unwrap, validate);
-    } catch (e) {
-      var del = delete_;
-    }
-
-    var src = (''+Object).split('Object');
-    var stringifier = function toString(){
-      return src[0] + nameOf(this) + src[1];
-    };
-
-    define(stringifier, stringifier);
-
-    var prep = { __proto__: [] } instanceof Array
-      ? function(f){ f.__proto__ = stringifier }
-      : function(f){ define(f, stringifier) };
-
-    prep(WeakMap);
-
-    [toString, get, set, has, del].forEach(function(method){
-      define(WeakMap.prototype, method);
-      prep(method);
-    });
-
-    return WeakMap;
-  }(new Data));
-
-  var defaultCreator = Object.create
-    ? function(){ return Object.create(null) }
-    : function(){ return {} };
-
-  function createStorage(creator){
-    var weakmap = new WM;
-    creator || (creator = defaultCreator);
-
-    function storage(object, value){
-      if (value || arguments.length === 2) {
-        weakmap.set(object, value);
-      } else {
-        value = weakmap.get(object);
-        if (value === undefined) {
-          value = creator(object);
-          weakmap.set(object, value);
-        }
-      }
-      return value;
-    }
-
-    return storage;
-  }
-
-
-  if (typeof module !== 'undefined') {
-    module.exports = WM;
-  } else if (typeof exports !== 'undefined') {
-    exports.WeakMap = WM;
-  } else if (!('WeakMap' in global)) {
-    global.WeakMap = WM;
-  }
-
-  WM.createStorage = createStorage;
-  if (global.WeakMap)
-    global.WeakMap.createStorage = createStorage;
-}((0, eval)('this'));
-
-},{}],12:[function(require,module,exports){
-var Vec2 = require('vec2')
-var Rec2 = require('rec2')
-
-var mouse, scroll, screen, size
-
-var element =
-exports.element = function (el, bind) {
-  var rec = el.getBoundingClientRect()    
-  var rec2 = new Rec2
-  
-  var style = getComputedStyle(el)
-  rec2.set((rec.left || 0)  - (parseFloat(style['margin-left']) || 0)
-    , (rec.top || 0) - (parseFloat(style['margin-top']) || 0)) 
-  //check if it's actually a Rec2 - if it's a vec2
-  //skip this step.
-  if(rec2.size)
-    rec2.size.set(rec.width, rec.height)
-
-  if(bind) {
-    rec2.size.change(function (size) {
-      console.log('wh', size.x, size.y)
-      el.style.width  = size.x + 'px'
-      el.style.height = size.y + 'px'
-    })
-  }
-
-  return rec2
-}
-
-exports.mouseEvent = mouseEvent
-
-//function (ev) {
-//  return new Vec2(ev.clientX, ev.clientY)
-//}
-
-//var style = getComputedStyle(el)
-// + parseFloat(style['margin-top'])
-// + parseFloat(style['margin-left'])
-
-var elementRec2 = function (el) {
-  var rec = el.getBoundingClientRect()    
-  var style = getComputedStyle(el)
-  return new Rec2(
-    rec.left - parseFloat(style.left),
-    rec.top - parseFloat(style.top),
-    rec.width, rec.height
-  )
-}
-
-function mouseEvent (ev) {
-  var vec = new Vec2()
-  return vec.set(ev.clientX, ev.clientY)
-}
-
-exports.mouse = function () {
-  if(mouse) return mouse
-  mouse = new Vec2()
-  window.addEventListener('mousemove', function (e) {
-    mouse.set(e.clientX, e.clientY)
-  })
-  return mouse
-}
-
-exports.scroll = function () {
-  if(scroll) return scroll
-  scroll = new Vec2()
-  scroll.set(e.clientX, e.clientY)
-  window.addEventListener('scroll', function (e) {
-    scroll.set(window.scrollX, window.scrollY)
-  })
-}
-
-exports.screenSize = function () {
-  if(size) return size
-  size = new Vec2()
-  window.addEventListener('resize', function (e) {
-    size.set(window.innerWidth, window.innerHeight)
-  })
-  size.set(window.innerWidth, window.innerHeight)
-  return size
-}
-
-
-//if bind=true this will make the element
-//track the position of the Vec2,
-//and will work around the DOM qwerk that
-
-exports.absolute = function (el, bind) {
-  var absolute =
-    element(el).subtract(element(el.parentElement))
-
-  if(bind) {
-    el.style.position = 'absolute'
-    function place () {
-      el.style.left = absolute.x + 'px'
-      el.style.top  = absolute.y + 'px'
-    }
-    absolute.change(place)
-    el.style.bottom = ''
-    el.style.right  = ''
-  }
-  return absolute
-}
-
-
-},{"rec2":13,"vec2":14}],13:[function(require,module,exports){
+},{}],20:[function(require,module,exports){
 var Vec2 = require('vec2')
 
 var inherits = require('util').inherits
@@ -1307,484 +2229,11 @@ R.collide = function (box) {
   )
 }
 
-},{"util":21,"vec2":14}],14:[function(require,module,exports){
-module.exports=require(1)
-},{}],15:[function(require,module,exports){
-//var touches = require('vec2-touch')
-var o       = require('observable')
-var Vec2    = require('vec2')
-
-var movement = require('./movement')
-
-//Aha, a vector layer just manages tiles...
-//you can change: it's dimensions, size, and zoom.
-
-module.exports = View
-  
-function View () {
-  if(!(this instanceof View)) return new View()
-  //absolute center. move this to view another part of the graph
-  this.center = new Vec2()
-  //conversion between model units and screen units.
-  //it is up to the user to select a sensible defaut for the zoom settings.
-  this.zoom = o()
-  this.zoom(1)
-  this.listeners = []
-  //the size of the view, from top-left to bottom-right
-  //this is set to the size of the canvas (for example)
-  var view = this.view = new Vec2()
-  
-  var vc = this._viewCenter = new Vec2()
-  var self = this
-  function update () {
-    self._viewCenter.set(self.view.x / 2, self.view.y / 2)
-    self.listeners.forEach(function (l) { l() })
-  }
-  this.center.change(update)
-  this.zoom(update)
-  this.view.change(update)
-}
-
-var proto = View.prototype
-proto.toModel = function (v, immutable) {
-  //handle scalars also.
-  if('number' === typeof v)
-    return v / this.zoom()
-  return this.view.divide(2, true).subtract(v).multiply(this.zoom())
-}
-
-proto.toView = function (v) {
-  //handle scalars also
-  if('number' === typeof v)
-    return v * this.zoom()
-
-  var _v = v
-    .subtract(this.center, true)
-    .multiply(this.zoom())
-    .add(this._viewCenter)
-  return _v
-}
-
-proto.change = function (listener) {
-  this.listeners = this.listeners || []
-  this.listeners.push(listener)
-  return this 
-}
-
-proto.ignore = function (listener) {
-  var i = this.listeners.indexOf(listener)
-  if(~i) this.listeners.splice(i, 1)
-  return !!~i
-}
-
-proto.track = function (canvas, opts) {
-  movement(this, canvas, opts)
-  return this
-}
-
-},{"./movement":16,"observable":17,"vec2":19}],16:[function(require,module,exports){
-var Vec2 = require('vec2')
-var Touch = require('vec2-touch')
-
-function isNumber(n) {
-  return 'number' === typeof n
-}
-
-function isFunction (f) {
-  return 'function' === typeof f
-}
-
-module.exports = function (view, canvas, opts) {
-
-  //the example is with a canvas,
-  //but this will work the same with
-  //dom or svg whatever
-
-  var rect = isFunction(canvas.getBoundingClientRect)
-    ? canvas.getBoundingClientRect()
-    : rect
-
-  if(isNumber(rect.width) && isNumber(rect.height))
-    view.view.set(rect.width, rect.height)
-  console.log(rect, view.view)
-  Touch(canvas, function (t) {
-    var _t = t.clone()
-    var diff = _t.clone()
-
-    t.change(function () {
-      //if you hold the shift key and drag, zoom instead of moving.
-      diff.set(_t).subtract(t).multiply(1/view.zoom())
-
-      if(t.event.shiftKey) {
-        var z = _t.y - t.y
-        view.zoom(view.zoom() * (100 + z) / 100)
-      } else {
-        view.center.add(diff)
-      }
-
-      _t.set(t)
-    })
-  }, {})
-
-
-  var keys = {
-    '39': 'right',
-    '37': 'left',
-    '38': 'up',
-    '40': 'down',
-    '187': '+',
-    '189': '-'
-  }
-
-  window.addEventListener('keydown', function (e) {
-    var motion = keys[e.keyCode]
-    if(!motion) return
-
-    var v = new Vec2()
-
-    if('+' === motion || '-' === motion)
-      return view.zoom(view.zoom() * (motion === '+' ? 1.25 : 0.8))
-
-    if('right' === motion) v.set(-1,  0)
-    if('left'  === motion) v.set( 1,  0)
-    if('up'    === motion) v.set( 0,  1)
-    if('down'  === motion) v.set( 0, -1)
-
-    v.divide(view.zoom()).multiply(20)
-    e.preventDefault()
-    view.center.add(v)
-  })
-
-}
-
-},{"vec2":19,"vec2-touch":18}],17:[function(require,module,exports){
-;(function () {
-
-// bind a to b -- One Way Binding
-function bind1(a, b) {
-  a(b()); b(a)
-}
-//bind a to b and b to a -- Two Way Binding
-function bind2(a, b) {
-  b(a()); a(b); b(a);
-}
-
-//---util-funtions------
-
-//check if this call is a get.
-function isGet(val) {
-  return undefined === val
-}
-
-//check if this call is a set, else, it's a listen
-function isSet(val) {
-  return 'function' !== typeof val
-}
-
-function isFunction (fun) {
-  return 'function' === typeof fun
-}
-
-function assertObservable (observable) {
-  if(!isFunction(observable))
-    throw new Error('transform expects an observable')
-  return observable
-}
-
-//trigger all listeners
-function all(ary, val) {
-  for(var k in ary)
-    ary[k](val)
-}
-
-//remove a listener
-function remove(ary, item) {
-  delete ary[ary.indexOf(item)]
-}
-
-//register a listener
-function on(emitter, event, listener) {
-  (emitter.on || emitter.addEventListener)
-    .call(emitter, event, listener, false)
-}
-
-function off(emitter, event, listener) {
-  (emitter.removeListener || emitter.removeEventListener || emitter.off)
-    .call(emitter, event, listener, false)
-}
-
-//An observable that stores a value.
-
-function value () {
-  var _val, listeners = []
-  return function (val) {
-    return (
-      isGet(val) ? _val
-    : isSet(val) ? all(listeners, _val = val)
-    : (listeners.push(val), val(_val), function () {
-        remove(listeners, val)
-      })
-  )}}
-  //^ if written in this style, always ends )}}
-
-/*
-##property
-observe a property of an object, works with scuttlebutt.
-could change this to work with backbone Model - but it would become ugly.
-*/
-
-function property (model, key) {
-  return function (val) {
-    return (
-      isGet(val) ? model.get(key) :
-      isSet(val) ? model.set(key, val) :
-      (on(model, 'change:'+key, val), val(model.get(key)), function () {
-        off(model, 'change:'+key, val)
-      })
-    )}}
-
-/*
-note the use of the elvis operator `?:` in chained else-if formation,
-and also the comma operator `,` which evaluates each part and then
-returns the last value.
-
-only 8 lines! that isn't much for what this baby can do!
-*/
-
-function transform (observable, down, up) {
-  assertObservable(observable)
-  return function (val) {
-    return (
-      isGet(val) ? down(observable())
-    : isSet(val) ? observable((up || down)(val))
-    : observable(function (_val) { val(down(_val)) })
-    )}}
-
-function not(observable) {
-  return transform(observable, function (v) { return !v })
-}
-
-function listen (element, event, attr, listener) {
-  function onEvent () {
-    listener(isFunction(attr) ? attr() : element[attr])
-  }
-  on(element, event, onEvent)
-  onEvent()
-  return function () {
-    off(element, event, onEvent)
-  }
-}
-
-//observe html element - aliased as `input`
-function attribute(element, attr, event) {
-  attr = attr || 'value'; event = event || 'input'
-  return function (val) {
-    return (
-      isGet(val) ? element[attr]
-    : isSet(val) ? element[attr] = val
-    : listen(element, event, attr, val)
-    )}
-}
-
-// observe a select element
-function select(element) {
-  function _attr () {
-      return element[element.selectedIndex].value;
-  }
-  function _set(val) {
-    for(var i=0; i < element.options.length; i++) {
-      if(element.options[i].value == val) element.selectedIndex = i;
-    }
-  }
-  return function (val) {
-    return (
-      isGet(val) ? element.options[element.selectedIndex].value
-    : isSet(val) ? _set(val)
-    : listen(element, 'change', _attr, val)
-    )}
-}
-
-//toggle based on an event, like mouseover, mouseout
-function toggle (el, up, down) {
-  var i = false
-  return function (val) {
-    function onUp() {
-      i || val(i = true)
-    }
-    function onDown () {
-      i && val(i = false)
-    }
-    return (
-      isGet(val) ? i
-    : isSet(val) ? undefined //read only
-    : (on(el, up, onUp), on(el, down || up, onDown), val(i), function () {
-      off(el, up, onUp); off(el, down || up, onDown)
-    })
-  )}}
-
-function error (message) {
-  throw new Error(message)
-}
-
-function compute (observables, compute) {
-  function getAll() {
-    return compute.apply(null, observables.map(function (e) {return e()}))
-  }
-
-  var cur = [], init = true
-
-  var v = value()
-
-  observables.forEach(function (f, i) {
-    f(function (val) {
-      cur[i] = val
-      if(init) return
-      v(compute.apply(null, cur))
-    })
-  })
-  init = false
-  v(function () {
-    compute.apply(null, cur)
-  })
-
-  return v
-}
-
-function boolean (observable, truthy, falsey) {
-  return (
-    transform(observable, function (val) {
-      return val ? truthy : falsey
-    }, function (val) {
-      return val == truthy ? true : false
-    })
-  )
-}
-
-function signal () {
-  var _val, listeners = []
-  return function (val) {
-    return (
-      isGet(val) ? _val
-        : isSet(val) ? (!(_val===val) ? all(listeners, _val = val):"")
-        : (listeners.push(val), val(_val), function () {
-           remove(listeners, val)
-        })
-    )}}
-
-var exports = value
-exports.bind1     = bind1
-exports.bind2     = bind2
-exports.value     = value
-exports.not       = not
-exports.property  = property
-exports.input     =
-exports.attribute = attribute
-exports.select    = select
-exports.compute   = compute
-exports.transform = transform
-exports.boolean   = boolean
-exports.toggle    = toggle
-exports.hover     = function (e) { return toggle(e, 'mouseover', 'mouseout')}
-exports.focus     = function (e) { return toggle(e, 'focus', 'blur')}
-exports.signal    = signal
-
-if('object' === typeof module) module.exports = exports
-else                           this.observable = exports
-})()
-
-},{}],18:[function(require,module,exports){
-var Vec2 = require('vec2')
-
-Touch.prototype = new Vec2()
-
-function Touch () {
-  //browsers optimise properties set in the contructor.
-  this.force = 0   ; this.event = null ; this.target = null;
-  this.start = true; this.end   = false; this.type = 'init'
-}
-
-// should not be called by user.
-// only browser should move touches.
-Touch.prototype._update = function (e, ev) {
-  ev = ev || e
-  this.force  = (
-    e.force || e.webkitForce || 
-    Math.min((1 + ev.ctrlKey + ev.altKey + ev.shiftKey) / 3, 1)
-  )
-
-  this.event  = ev
-  this.id     = e.identifier != null ? e.identifier : -1
-  this.target = e.target
-  this.type   = ev.type
-  this.end = /(end|up)$/.test(this.type)
-  this.set(e.clientX, e.clientY)
-
-  if(this.end) {
-    this.change()
-    this.observers = [] //deregister listeners
-  }
-  return this
-}
-
-module.exports = function (el, handler, opts) {
-
-  if('function' === typeof el)
-    handler = el, el = document.documentElement, opts = handler || {}
-  
-  var touches = []
-
-  function each(iter) {
-    return function (ev) {
-      [].forEach.call(ev.changedTouches,  function (e) { iter(e, ev) }) 
-      if(opts.preventDefault)
-        ev.preventDefault()
-    }
-  }
-
-  var touchStart = each(function (e, ev) {
-    handler(touches[e.identifier] = new Touch()._update(e, ev), touches)
-  })
-
-  var touchMove = each(function (e, ev) {
-    touches[e.identifier]._update(e, ev)
-  })
-
-  var touchEnd = each(function (e, ev) {
-    touches[e.identifier]._update(e, ev)
-    delete touches[e.identifier]
-  })
-
-  el.addEventListener('touchstart',    touchStart)
-  el.addEventListener('touchmove',     touchMove)
-  el.addEventListener('touchend',      touchEnd)
-  el.addEventListener('MozTouchStart', touchStart)
-  el.addEventListener('MozTouchMove',  touchMove)
-  el.addEventListener('MozTouchEnd',   touchEnd)
-  
-  if(opts.mouse !== false) {
-    var down = false
-    el.addEventListener('mousedown', function (ev) {
-      down = true
-      handler(touches[-1] = new Touch()._update(ev), touches)
-    }) 
-    el.addEventListener('mousemove', function (ev) {
-      if(!down) return
-      touches[-1]._update(ev)
-    })
-    el.addEventListener('mouseup',   function (ev) {
-      down = false
-      touches[-1]._update(ev)    
-      delete touches[-1]
-    }) 
-  }
-
-  return touches
-}
-
-
-},{"vec2":19}],19:[function(require,module,exports){
-module.exports=require(1)
-},{}],20:[function(require,module,exports){
+},{"util":24,"vec2":21}],21:[function(require,module,exports){
+module.exports=require(19)
+},{}],22:[function(require,module,exports){
+module.exports=require(19)
+},{}],23:[function(require,module,exports){
 
 
 //
@@ -2002,7 +2451,7 @@ if (typeof Object.getOwnPropertyDescriptor === 'function') {
   exports.getOwnPropertyDescriptor = valueObject;
 }
 
-},{}],21:[function(require,module,exports){
+},{}],24:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -2547,8 +2996,8 @@ function hasOwnProperty(obj, prop) {
   return Object.prototype.hasOwnProperty.call(obj, prop);
 }
 
-},{"_shims":20}],22:[function(require,module,exports){
+},{"_shims":23}],25:[function(require,module,exports){
 
-},{}]},{},[2])
+},{}]},{},[1])
 ;</script>
 </html>
