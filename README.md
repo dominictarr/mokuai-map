@@ -1,5 +1,6 @@
-# vec2-tiles
+# mokuai-map
 
+modular tile maps UI
 
 ## License
 
